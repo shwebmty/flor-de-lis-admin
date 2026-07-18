@@ -73,6 +73,8 @@
   .imgcell.dragging{opacity:.4;}
   .imgcell .check{position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:var(--vino);color:#fff;font-size:12px;display:none;align-items:center;justify-content:center;}
   .imgcell.sel .check{display:flex;}
+  .imgcell .imgdel{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:rgba(43,36,32,0.78);color:#fff;border:none;font-size:13px;line-height:1;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0;}
+  .imgcell:hover .imgdel{display:flex;}
   .nofotos{font-size:13px;color:var(--tinta-suave);font-style:italic;align-self:center;}
   /* Modal */
   .overlay{position:fixed;inset:0;background:rgba(43,36,32,0.5);display:none;z-index:50;align-items:center;justify-content:center;padding:20px;}
@@ -136,6 +138,11 @@
 <!-- ============ PESTAÑA IMÁGENES ============ -->
 <div class="wrap" id="view-img" style="display:none">
   <p class="hint">Arrastra una foto y suéltala sobre otro producto para reasignarla. O selecciónala con clic (varias con Ctrl/Cmd+clic) y usa el menú <b>“Mover selección a…”</b> que aparece en el producto. El botón × elimina una foto.</p>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+    <button class="btn btn-ghost" id="undoBtn" style="padding:6px 14px;font-size:13px" onclick="undo()" disabled>↶ Deshacer</button>
+    <button class="btn btn-ghost" id="redoBtn" style="padding:6px 14px;font-size:13px" onclick="redo()" disabled>↷ Rehacer</button>
+    <span style="font-size:12px;color:var(--tinta-suave)">(Ctrl+Z / Ctrl+Shift+Z)</span>
+  </div>
   <div class="imgsel" id="imgsel" style="display:none">
     <span class="tag" id="imgselcount">0 foto(s) seleccionadas</span>
     <button class="btn btn-ghost" style="padding:5px 12px;font-size:12px" onclick="clearImgSelection()">Cancelar selección</button>
@@ -315,6 +322,7 @@ function renderImages(){
                    ondragend="onImgDragEnd(event)"
                    onclick="onImgClick(event,'${p.id}',${im.id},'${esc(im.url)}')">
                 <span class="check">✓</span>
+                <button class="imgdel" title="Eliminar foto" onclick="deleteImage(event,'${p.id}',${im.id},'${esc(im.url)}')">×</button>
               </div>`;
     }).join("");
     const empty = p.images.length ? "" : `<span class="nofotos">Sin fotos</span>`;
@@ -368,16 +376,95 @@ async function moveSelectionTo(targetId){ if(targetId) await doMove(targetId); }
 async function doMove(targetId){
   const ids = imgSelection.map(s=>s.imageId);
   try{
+    const moved=[];
     for(const imageId of ids){
-      await api(`/api/admin/images/${imageId}/move`,{method:"POST",body:JSON.stringify({target_product_id:targetId})});
+      const r = await api(`/api/admin/images/${imageId}/move`,{method:"POST",body:JSON.stringify({target_product_id:targetId})});
+      moved.push({imageId, from:r.from_product_id});
     }
+    pushHistory({type:"move", moved, to:targetId});
     toast(ids.length>1?`${ids.length} fotos movidas`:"Foto movida");
     imgSelection=[];
-    DATA = await api("/api/admin/products");
-    renderStats(); renderImages();
-    if(document.getElementById("view-cat").style.display!=="none") renderTable();
+    await reloadImages();
   }catch(err){ toast(err.message); }
 }
+
+/* ---- Eliminar imagen ---- */
+async function deleteImage(e, productId, imageId, url){
+  e.stopPropagation();
+  try{
+    const r = await api(`/api/admin/images/${imageId}`,{method:"DELETE"});
+    // guardamos los datos borrados para poder deshacer
+    pushHistory({type:"delete", deleted:r.deleted});
+    imgSelection = imgSelection.filter(s=>s.imageId!==imageId);
+    toast("Foto eliminada");
+    await reloadImages();
+  }catch(err){ toast(err.message); }
+}
+
+/* ---- Historial undo/redo (en memoria, solo esta sesión) ---- */
+let undoStack=[], redoStack=[];
+function pushHistory(action){ undoStack.push(action); redoStack=[]; updateUndoButtons(); }
+function updateUndoButtons(){
+  document.getElementById("undoBtn").disabled = undoStack.length===0;
+  document.getElementById("redoBtn").disabled = redoStack.length===0;
+}
+async function reloadImages(){
+  DATA = await api("/api/admin/products");
+  renderStats(); renderImages();
+  if(document.getElementById("view-cat").style.display!=="none") renderTable();
+}
+
+async function undo(){
+  const a = undoStack.pop(); if(!a) return;
+  try{
+    if(a.type==="move"){
+      // regresar cada foto a su producto original
+      for(const mv of a.moved){
+        if(mv.from) await api(`/api/admin/images/${mv.imageId}/move`,{method:"POST",body:JSON.stringify({target_product_id:mv.from})});
+      }
+    }else if(a.type==="delete"){
+      // recrear la foto borrada; guardamos el nuevo id para poder rehacer
+      const d=a.deleted;
+      const r=await api(`/api/admin/images`,{method:"POST",body:JSON.stringify({product_id:d.product_id, url:d.url, variant_id:d.variant_id, sort_order:d.sort_order})});
+      a.restoredId=r.id;
+    }else if(a.type==="add"){
+      // deshacer un "agregar" = borrar la foto agregada
+      await api(`/api/admin/images/${a.imageId}`,{method:"DELETE"});
+    }
+    redoStack.push(a); updateUndoButtons();
+    toast("Acción deshecha");
+    await reloadImages();
+  }catch(err){ toast("No se pudo deshacer: "+err.message); undoStack.push(a); updateUndoButtons(); }
+}
+
+async function redo(){
+  const a = redoStack.pop(); if(!a) return;
+  try{
+    if(a.type==="move"){
+      for(const mv of a.moved){
+        await api(`/api/admin/images/${mv.imageId}/move`,{method:"POST",body:JSON.stringify({target_product_id:a.to})});
+      }
+    }else if(a.type==="delete"){
+      // rehacer un borrado = volver a borrar la foto restaurada
+      const id = a.restoredId || a.deleted.id;
+      await api(`/api/admin/images/${id}`,{method:"DELETE"});
+    }else if(a.type==="add"){
+      const r=await api(`/api/admin/images`,{method:"POST",body:JSON.stringify({product_id:a.product_id, url:a.url})});
+      a.imageId=r.id;
+    }
+    undoStack.push(a); updateUndoButtons();
+    toast("Acción rehecha");
+    await reloadImages();
+  }catch(err){ toast("No se pudo rehacer: "+err.message); redoStack.push(a); updateUndoButtons(); }
+}
+
+// Atajos de teclado
+window.addEventListener("keydown",(e)=>{
+  const z = e.key==="z"||e.key==="Z";
+  const y = e.key==="y"||e.key==="Y";
+  if((e.ctrlKey||e.metaKey) && z && !e.shiftKey){ e.preventDefault(); undo(); }
+  else if((e.ctrlKey||e.metaKey) && ((z && e.shiftKey) || y)){ e.preventDefault(); redo(); }
+});
 
 /* ---- Modal producto ---- */
 function fillCatSelect(sel,selectedId){ sel.innerHTML=DATA.categories.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join(""); }
