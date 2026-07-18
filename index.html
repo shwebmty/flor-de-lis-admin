@@ -5,56 +5,361 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Flor de Lis — Panel de administrador</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root{ --vino:#6e1f2f; --oro:#b8863b; --crema:#f8f3ea; --tinta:#2b2420; --tinta-suave:#6b5f52; }
+  :root{ --vino:#6e1f2f; --vino-osc:#591824; --oro:#b8863b; --crema:#f8f3ea; --crema-2:#efe6d8;
+         --tinta:#2b2420; --tinta-suave:#6b5f52; --verde:#2f7d4f; --gris:#c9c1b4; }
   *{box-sizing:border-box;}
-  body{margin:0;min-height:100vh;background:var(--crema);color:var(--tinta);
-       font-family:'Manrope',sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;}
-  .card{max-width:520px;width:100%;background:#fff;border:1px solid rgba(184,134,59,0.35);
-        border-radius:8px;padding:40px;text-align:center;}
-  .brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:24px;}
-  .brand span{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;}
-  h1{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;margin:0 0 10px;}
-  p{font-size:15px;line-height:1.6;color:var(--tinta-suave);margin:0 0 8px;}
-  .who{margin-top:24px;padding:14px 18px;border-radius:6px;background:var(--crema);
-       border:1px solid rgba(184,134,59,0.3);font-size:14px;}
-  .who strong{color:var(--vino);}
-  .badge{display:inline-block;margin-top:20px;font-size:12px;font-weight:700;letter-spacing:1px;
-         text-transform:uppercase;color:var(--oro);}
+  body{margin:0;background:var(--crema);color:var(--tinta);font-family:'Manrope',sans-serif;-webkit-font-smoothing:antialiased;}
+  a{color:var(--vino);}
+  .serif{font-family:'Cormorant Garamond',serif;}
+  header{background:var(--tinta);color:var(--crema);padding:14px clamp(16px,4vw,32px);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand span{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;}
+  .badge{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--oro);}
+  .who{font-size:13px;color:rgba(248,243,234,0.7);}
+  .wrap{max-width:1180px;margin:0 auto;padding:clamp(16px,4vw,32px);}
+  .toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:20px;}
+  .search{flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--gris);border-radius:6px;font-family:inherit;font-size:14px;background:#fff;}
+  .btn{border:none;border-radius:6px;padding:10px 16px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;}
+  .btn-primary{background:var(--vino);color:var(--crema);}
+  .btn-primary:hover{background:var(--vino-osc);}
+  .btn-ghost{background:#fff;color:var(--vino);border:1.5px solid var(--vino);}
+  .btn-sm{padding:6px 12px;font-size:13px;}
+  .stats{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;font-size:14px;color:var(--tinta-suave);}
+  .stats b{color:var(--tinta);}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;}
+  .chip{padding:6px 14px;border-radius:30px;border:1.5px solid rgba(110,31,47,0.3);background:transparent;color:var(--vino);font-size:12px;font-weight:600;cursor:pointer;}
+  .chip.active{background:var(--vino);color:var(--crema);border-color:var(--vino);}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(43,36,32,0.08);}
+  th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--crema-2);font-size:14px;vertical-align:middle;}
+  th{background:var(--crema-2);font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--tinta-suave);}
+  tr:last-child td{border-bottom:none;}
+  .pthumb{width:46px;height:46px;border-radius:6px;object-fit:cover;background:var(--crema-2);}
+  .pname{font-weight:600;}
+  .pcat{font-size:12px;color:var(--oro);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+  .switch{position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;inset:0;background:var(--gris);border-radius:24px;transition:.2s;}
+  .slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+  .switch input:checked + .slider{background:var(--verde);}
+  .switch input:checked + .slider:before{transform:translateX(20px);}
+  .state-tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;}
+  .state-on{background:rgba(47,125,79,0.12);color:var(--verde);}
+  .state-off{background:rgba(43,36,32,0.08);color:var(--tinta-suave);}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap;}
+  .link-btn{background:none;border:none;color:var(--vino);font-weight:600;cursor:pointer;font-size:13px;text-decoration:underline;padding:0;}
+  /* Modal */
+  .overlay{position:fixed;inset:0;background:rgba(43,36,32,0.5);display:none;z-index:50;align-items:center;justify-content:center;padding:20px;}
+  .overlay.open{display:flex;}
+  .modal{background:var(--crema);border-radius:10px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;padding:28px;}
+  .modal h3{font-family:'Cormorant Garamond',serif;font-size:26px;margin:0 0 18px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;}
+  .field input,.field textarea,.field select{width:100%;padding:10px 12px;border:1px solid var(--gris);border-radius:6px;font-family:inherit;font-size:14px;background:#fff;}
+  .field textarea{min-height:90px;resize:vertical;}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;}
+  .imgs-strip{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .imgs-strip img{width:54px;height:54px;object-fit:cover;border-radius:5px;}
+  .loading{text-align:center;padding:60px 20px;color:var(--tinta-suave);}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--tinta);color:var(--crema);padding:12px 20px;border-radius:8px;font-size:14px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .err{color:var(--vino);font-size:13px;margin-top:6px;}
+  @media(max-width:640px){ .hide-sm{display:none;} th,td{padding:10px 8px;} }
 </style>
 </head>
 <body>
-  <div class="card">
-    <div class="brand">
-      <svg width="26" height="32" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M16 0C11 6 9 11 9 16c0 4 3 7 7 7s7-3 7-7c0-5-2-10-7-16z" fill="#b8863b"></path>
-        <path d="M9 12c-5 1-8 5-7 9 1 3 4 5 7 4 2-1 3-3 3-5-3-1-4-4-3-8z" fill="#b8863b"></path>
-        <path d="M23 12c5 1 8 5 7 9-1 3-4 5-7 4-2-1-3-3-3-5 3-1 4-4 3-8z" fill="#b8863b"></path>
-        <rect x="10" y="24" width="12" height="3" rx="1.5" fill="#b8863b"></rect>
-        <path d="M14 27h4v10a2 2 0 01-2 2 2 2 0 01-2-2V27z" fill="#b8863b"></path>
-      </svg>
-      <span>Flor de Lis</span>
+<header>
+  <div class="brand">
+    <svg width="22" height="27" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M16 0C11 6 9 11 9 16c0 4 3 7 7 7s7-3 7-7c0-5-2-10-7-16z" fill="#b8863b"></path>
+      <path d="M9 12c-5 1-8 5-7 9 1 3 4 5 7 4 2-1 3-3 3-5-3-1-4-4-3-8z" fill="#b8863b"></path>
+      <path d="M23 12c5 1 8 5 7 9-1 3-4 5-7 4-2-1-3-3-3-5 3-1 4-4 3-8z" fill="#b8863b"></path>
+      <rect x="10" y="24" width="12" height="3" rx="1.5" fill="#b8863b"></rect>
+      <path d="M14 27h4v10a2 2 0 01-2 2 2 2 0 01-2-2V27z" fill="#b8863b"></path>
+    </svg>
+    <span>Flor de Lis</span>
+    <span class="badge">· Admin</span>
+  </div>
+  <div class="who" id="who">…</div>
+</header>
+
+<div class="wrap">
+  <div class="toolbar">
+    <input class="search" id="search" placeholder="Buscar por nombre…" oninput="render()">
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-ghost" onclick="openCategoryModal()">+ Categoría</button>
+      <button class="btn btn-primary" onclick="openProductModal()">+ Producto</button>
     </div>
-    <span class="badge">Panel de administrador</span>
-    <h1 style="margin-top:14px;">Acceso verificado</h1>
-    <p>Si estás viendo esta página, el inicio de sesión con Google quedó bien configurado.</p>
-    <div class="who" id="who">Comprobando tu sesión…</div>
-    <p style="margin-top:24px;font-size:13px;">El panel completo (activar productos, editar, fotos y pedidos) se está construyendo y aparecerá aquí en breve.</p>
   </div>
 
+  <div class="stats" id="stats"></div>
+  <div class="filters" id="filters"></div>
+
+  <div id="tableWrap">
+    <div class="loading">Cargando catálogo…</div>
+  </div>
+</div>
+
+<!-- Modal producto -->
+<div class="overlay" id="prodOverlay">
+  <div class="modal">
+    <h3 id="prodModalTitle" class="serif">Editar producto</h3>
+    <div class="field"><label>Nombre</label><input id="f_name"></div>
+    <div class="field" id="f_id_wrap" style="display:none"><label>ID (código único, ej. p054)</label><input id="f_id"></div>
+    <div class="field"><label>Categoría</label><select id="f_cat"></select></div>
+    <div class="field"><label>Precio (MXN)</label><input id="f_price" type="number" min="0"></div>
+    <div class="field"><label>Descripción</label><textarea id="f_desc"></textarea></div>
+    <div class="field"><label>Existencias (opcional, normalmente 1)</label><input id="f_stock" type="number" min="0" placeholder="dejar vacío = no mostrar"></div>
+    <div id="f_imgs_wrap" class="field" style="display:none">
+      <label>Imágenes actuales</label>
+      <div class="imgs-strip" id="f_imgs"></div>
+    </div>
+    <div class="err" id="prodErr"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeProductModal()">Cancelar</button>
+      <button class="btn btn-primary" id="prodSaveBtn" onclick="saveProduct()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal categoría -->
+<div class="overlay" id="catOverlay">
+  <div class="modal" style="max-width:420px">
+    <h3 class="serif">Nueva categoría</h3>
+    <div class="field"><label>Nombre de la categoría</label><input id="c_name" placeholder="Ej. Veladoras"></div>
+    <div class="err" id="catErr"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeCategoryModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCategory()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal mover imagen -->
+<div class="overlay" id="moveOverlay">
+  <div class="modal" style="max-width:460px">
+    <h3 class="serif">Mover imagen a otro producto</h3>
+    <div style="text-align:center;margin-bottom:16px"><img id="move_preview" style="width:90px;height:90px;object-fit:cover;border-radius:8px"></div>
+    <div class="field"><label>Producto destino</label><select id="move_target"></select></div>
+    <div class="err" id="moveErr"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeMoveModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmMove()">Mover</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <script>
-  // Cloudflare Access expone la identidad del usuario autenticado en esta ruta.
-  fetch("/cdn-cgi/access/get-identity")
-    .then(r => r.ok ? r.json() : Promise.reject())
-    .then(id => {
-      document.getElementById("who").innerHTML =
-        'Entraste como <strong>' + (id.email || "usuario autenticado") + '</strong>';
-    })
-    .catch(() => {
-      document.getElementById("who").textContent =
-        "No se pudo leer la sesión (esto es normal si aún no configuras Cloudflare Access).";
-    });
+const API = "https://flor-de-lis-api.shweb-mty.workers.dev";
+let DATA = { products: [], categories: [] };
+let activeCat = "Todos";
+let editingId = null;      // id del producto en edición (null = nuevo)
+let moveImageId = null;    // id de imagen a mover
+
+/* ---- Helpers de red (Access añade el pase automáticamente vía cookie) ---- */
+async function api(path, opts={}){
+  const res = await fetch(API+path, {
+    ...opts,
+    headers: { "Content-Type":"application/json", ...(opts.headers||{}) },
+    credentials: "include",
+  });
+  if(res.status===401) throw new Error("Sesión no autorizada. Recarga la página e inicia sesión de nuevo.");
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || "Error");
+  return data;
+}
+function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+
+/* ---- Carga inicial ---- */
+async function init(){
+  try{
+    // quién soy (viene del pase de Access, verificado por el Worker)
+    api("/api/admin/me").then(me=>{ document.getElementById("who").textContent = me.email; }).catch(()=>{});
+    DATA = await api("/api/admin/products");
+    renderFilters(); renderStats(); render();
+  }catch(err){
+    document.getElementById("tableWrap").innerHTML =
+      '<div class="loading">'+esc(err.message)+'</div>';
+  }
+}
+
+function renderStats(){
+  const total = DATA.products.length;
+  const on = DATA.products.filter(p=>p.disponible).length;
+  document.getElementById("stats").innerHTML =
+    `<span><b>${total}</b> productos</span><span><b>${on}</b> activos</span><span><b>${total-on}</b> ocultos</span><span><b>${DATA.categories.length}</b> categorías</span>`;
+}
+function renderFilters(){
+  const names = ["Todos", ...DATA.categories.map(c=>c.name)];
+  document.getElementById("filters").innerHTML = names.map(n=>
+    `<button class="chip ${n===activeCat?'active':''}" onclick="setCat('${esc(n).replace(/'/g,"\\'")}')">${esc(n)}</button>`
+  ).join("");
+}
+function setCat(n){ activeCat=n; renderFilters(); render(); }
+
+function render(){
+  const q = (document.getElementById("search").value||"").toLowerCase();
+  let list = DATA.products;
+  if(activeCat!=="Todos") list = list.filter(p=>p.category===activeCat);
+  if(q) list = list.filter(p=>p.name.toLowerCase().includes(q));
+  if(!list.length){ document.getElementById("tableWrap").innerHTML='<div class="loading">Sin productos que coincidan.</div>'; return; }
+  const rows = list.map(p=>{
+    const img = p.images[0] ? `<img class="pthumb" src="${esc(p.images[0].url)}" alt="">` : `<div class="pthumb"></div>`;
+    return `<tr>
+      <td>${img}</td>
+      <td>
+        <div class="pname">${esc(p.name)}</div>
+        <div class="pcat">${esc(p.category)}</div>
+      </td>
+      <td class="hide-sm">$${p.price}</td>
+      <td class="hide-sm">${p.images.length} 📷</td>
+      <td>
+        <label class="switch">
+          <input type="checkbox" ${p.disponible?'checked':''} onchange="toggle('${p.id}',this.checked)">
+          <span class="slider"></span>
+        </label>
+      </td>
+      <td>
+        <div class="row-actions">
+          <button class="link-btn" onclick="openProductModal('${p.id}')">Editar</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+  document.getElementById("tableWrap").innerHTML =
+    `<table><thead><tr><th></th><th>Producto</th><th class="hide-sm">Precio</th><th class="hide-sm">Fotos</th><th>Visible</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+/* ---- Activar / desactivar ---- */
+async function toggle(id, val){
+  try{
+    await api(`/api/admin/products/${id}/toggle`, { method:"POST", body: JSON.stringify({disponible: val}) });
+    const p = DATA.products.find(x=>x.id===id); if(p) p.disponible = val?1:0;
+    renderStats();
+    toast(val ? "Producto activado" : "Producto oculto");
+  }catch(err){ toast(err.message); render(); }
+}
+
+/* ---- Modal producto (editar o nuevo) ---- */
+function fillCatSelect(sel, selectedId){
+  sel.innerHTML = DATA.categories.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join("");
+}
+function openProductModal(id){
+  editingId = id || null;
+  const isNew = !editingId;
+  document.getElementById("prodModalTitle").textContent = isNew ? "Nuevo producto" : "Editar producto";
+  document.getElementById("f_id_wrap").style.display = isNew ? "block" : "none";
+  document.getElementById("prodErr").textContent = "";
+  fillCatSelect(document.getElementById("f_cat"));
+  if(isNew){
+    document.getElementById("f_name").value="";
+    document.getElementById("f_id").value="";
+    document.getElementById("f_price").value="";
+    document.getElementById("f_desc").value="";
+    document.getElementById("f_stock").value="";
+    document.getElementById("f_imgs_wrap").style.display="none";
+  }else{
+    const p = DATA.products.find(x=>x.id===editingId);
+    document.getElementById("f_name").value=p.name;
+    document.getElementById("f_cat").value=p.category_id;
+    document.getElementById("f_price").value=p.price;
+    document.getElementById("f_desc").value=p.description||"";
+    document.getElementById("f_stock").value=(p.stock??"");
+    // imágenes con opción de mover
+    const wrap = document.getElementById("f_imgs_wrap");
+    if(p.images.length){
+      wrap.style.display="block";
+      document.getElementById("f_imgs").innerHTML = p.images.map(im=>
+        `<div style="text-align:center">
+           <img src="${esc(im.url)}" alt="">
+           <div><button class="link-btn" style="font-size:11px" onclick="openMoveModal(${im.id})">mover</button></div>
+         </div>`).join("");
+    }else{ wrap.style.display="none"; }
+  }
+  document.getElementById("prodOverlay").classList.add("open");
+}
+function closeProductModal(){ document.getElementById("prodOverlay").classList.remove("open"); }
+
+async function saveProduct(){
+  const btn = document.getElementById("prodSaveBtn");
+  const errEl = document.getElementById("prodErr"); errEl.textContent="";
+  const payload = {
+    name: document.getElementById("f_name").value.trim(),
+    category_id: Number(document.getElementById("f_cat").value),
+    price: document.getElementById("f_price").value,
+    description: document.getElementById("f_desc").value.trim(),
+    stock: document.getElementById("f_stock").value,
+  };
+  if(!payload.name){ errEl.textContent="El nombre es obligatorio."; return; }
+  btn.disabled=true;
+  try{
+    if(editingId){
+      await api(`/api/admin/products/${editingId}`, { method:"PUT", body: JSON.stringify(payload) });
+      toast("Cambios guardados");
+    }else{
+      payload.id = document.getElementById("f_id").value.trim();
+      if(!payload.id){ errEl.textContent="El ID es obligatorio para un producto nuevo."; btn.disabled=false; return; }
+      await api(`/api/admin/products`, { method:"POST", body: JSON.stringify(payload) });
+      toast("Producto creado");
+    }
+    closeProductModal();
+    DATA = await api("/api/admin/products");
+    renderFilters(); renderStats(); render();
+  }catch(err){ errEl.textContent=err.message; }
+  btn.disabled=false;
+}
+
+/* ---- Modal categoría ---- */
+function openCategoryModal(){ document.getElementById("c_name").value=""; document.getElementById("catErr").textContent=""; document.getElementById("catOverlay").classList.add("open"); }
+function closeCategoryModal(){ document.getElementById("catOverlay").classList.remove("open"); }
+async function saveCategory(){
+  const name = document.getElementById("c_name").value.trim();
+  const errEl = document.getElementById("catErr"); errEl.textContent="";
+  if(!name){ errEl.textContent="Escribe un nombre."; return; }
+  try{
+    await api(`/api/admin/categories`, { method:"POST", body: JSON.stringify({name}) });
+    toast("Categoría creada");
+    closeCategoryModal();
+    DATA = await api("/api/admin/products");
+    renderFilters(); renderStats(); render();
+  }catch(err){ errEl.textContent=err.message; }
+}
+
+/* ---- Mover imagen entre productos ---- */
+function openMoveModal(imageId){
+  moveImageId = imageId;
+  const sel = document.getElementById("move_target");
+  sel.innerHTML = DATA.products
+    .filter(p=>p.id!==editingId)
+    .map(p=>`<option value="${p.id}">${esc(p.name)} (${esc(p.category)})</option>`).join("");
+  // preview
+  let url="";
+  const p = DATA.products.find(x=>x.id===editingId);
+  if(p){ const im = p.images.find(i=>i.id===imageId); if(im) url=im.url; }
+  document.getElementById("move_preview").src=url;
+  document.getElementById("moveErr").textContent="";
+  document.getElementById("moveOverlay").classList.add("open");
+}
+function closeMoveModal(){ document.getElementById("moveOverlay").classList.remove("open"); }
+async function confirmMove(){
+  const target = document.getElementById("move_target").value;
+  const errEl = document.getElementById("moveErr"); errEl.textContent="";
+  try{
+    await api(`/api/admin/images/${moveImageId}/move`, { method:"POST", body: JSON.stringify({target_product_id: target}) });
+    toast("Imagen movida");
+    closeMoveModal();
+    DATA = await api("/api/admin/products");
+    renderStats(); render();
+    // refrescar el modal de edición si sigue abierto
+    if(editingId) openProductModal(editingId);
+  }catch(err){ errEl.textContent=err.message; }
+}
+
+init();
 </script>
 </body>
 </html>
