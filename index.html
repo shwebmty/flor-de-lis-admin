@@ -61,6 +61,7 @@
   .imgsel .tag{font-size:13px;color:var(--vino);font-weight:600;}
   .prow{background:#fff;border:1px solid rgba(184,134,59,0.3);border-radius:8px;padding:16px;transition:border-color .15s, background .15s;}
   .prow.dragover{border-color:var(--vino);background:rgba(110,31,47,0.04);}
+  .prow.dropfiles{border-color:var(--oro);border-style:dashed;background:rgba(184,134,59,0.06);}
   .prow-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
   .prow-head .nm{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:600;}
   .prow-head .ct{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--oro);}
@@ -75,6 +76,11 @@
   .imgcell.sel .check{display:flex;}
   .imgcell .imgdel{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:rgba(43,36,32,0.78);color:#fff;border:none;font-size:13px;line-height:1;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0;}
   .imgcell:hover .imgdel{display:flex;}
+  /* Celda para subir foto nueva */
+  .imgcell.imgadd{display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed var(--oro);background:transparent;color:var(--oro);cursor:pointer;font-size:12px;font-weight:700;text-align:center;line-height:1.25;gap:2px;}
+  .imgcell.imgadd:hover{background:rgba(184,134,59,0.10);}
+  .imgcell.imgadd .plus{font-size:26px;font-weight:400;line-height:1;}
+  .imgcell.imgadd.busy{opacity:.6;cursor:progress;border-style:solid;}
   .nofotos{font-size:13px;color:var(--tinta-suave);font-style:italic;align-self:center;}
   /* Modal */
   .overlay{position:fixed;inset:0;background:rgba(43,36,32,0.5);display:none;z-index:50;align-items:center;justify-content:center;padding:20px;}
@@ -137,7 +143,7 @@
 
 <!-- ============ PESTAÑA IMÁGENES ============ -->
 <div class="wrap" id="view-img" style="display:none">
-  <p class="hint">Arrastra una foto y suéltala sobre otro producto para reasignarla. O selecciónala con clic (varias con Ctrl/Cmd+clic) y usa el menú <b>“Mover selección a…”</b> que aparece en el producto. El botón × elimina una foto.</p>
+  <p class="hint">Para <b>subir una foto nueva</b>: usa la casilla punteada “＋ Foto” en cada producto, o arrastra imágenes desde tu computadora y suéltalas sobre el producto. Para <b>reasignar</b> una foto existente: arrástrala sobre otro producto, o selecciónala (varias con Ctrl/Cmd+clic) y usa “Mover selección a…”. El botón × elimina una foto.</p>
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
     <button class="btn btn-ghost" id="undoBtn" style="padding:6px 14px;font-size:13px" onclick="undo()" disabled>↶ Deshacer</button>
     <button class="btn btn-ghost" id="redoBtn" style="padding:6px 14px;font-size:13px" onclick="redo()" disabled>↷ Rehacer</button>
@@ -150,6 +156,9 @@
   <input class="search" id="imgsearch" placeholder="Buscar producto…" style="max-width:360px;margin-bottom:20px" oninput="renderImages()">
   <div id="imagesWrap"><div class="loading">Cargando…</div></div>
 </div>
+
+<!-- Input de archivo oculto, compartido para todas las subidas -->
+<input type="file" id="uploadInput" accept="image/*" multiple style="display:none" onchange="onFilesPicked(event)">
 
 <!-- Modal producto -->
 <div class="overlay" id="prodOverlay">
@@ -192,6 +201,7 @@ let editingId = null;
 let picks = new Set();              // ids de productos seleccionados (catálogo)
 let imgSelection = [];             // [{productId, imageId, url}] selección de fotos
 let dragImage = null;             // {productId, imageId} arrastrada
+let uploadProductId = null;       // producto destino de la subida en curso
 
 async function api(path, opts={}){
   const res = await fetch(API+path, {
@@ -325,11 +335,14 @@ function renderImages(){
                 <button class="imgdel" title="Eliminar foto" onclick="deleteImage(event,'${p.id}',${im.id},'${esc(im.url)}')">×</button>
               </div>`;
     }).join("");
-    const empty = p.images.length ? "" : `<span class="nofotos">Sin fotos</span>`;
+    // Celda punteada para subir foto nueva a este producto
+    const addCell = `<div class="imgcell imgadd" id="add-${p.id}" title="Subir foto nueva" onclick="triggerUpload('${p.id}')">
+                       <span class="plus">＋</span><span>Foto</span>
+                     </div>`;
     return `<div class="prow" ondragover="onRowDragOver(event,'${p.id}')" ondragleave="onRowDragLeave(event,'${p.id}')" ondrop="onRowDrop(event,'${p.id}')">
       <div class="prow-head"><span class="nm">${esc(p.name)}</span><span class="ct">${esc(p.category)}</span><span style="font-size:12px;color:var(--tinta-suave)">· ${p.images.length} foto(s)</span></div>
       ${moveBox}
-      <div class="imgs">${cells}${empty}</div>
+      <div class="imgs">${cells}${addCell}</div>
     </div>`;
   }).join('<div style="height:14px"></div>');
   renderImgSel();
@@ -356,7 +369,7 @@ function onImgClick(e,productId,imageId,url){
   }
   renderImages();
 }
-/* drag and drop */
+/* drag and drop (reasignar fotos existentes) */
 function onImgDragStart(e,productId,imageId){
   // si arrastras una foto seleccionada, mueve toda la selección; si no, solo esa
   if(!imgSelection.some(s=>s.imageId===imageId)) imgSelection=[{productId,imageId,url:""}];
@@ -364,10 +377,24 @@ function onImgDragStart(e,productId,imageId){
   e.dataTransfer.effectAllowed="move";
 }
 function onImgDragEnd(e){ dragImage=null; }
-function onRowDragOver(e,productId){ if(dragImage){ e.preventDefault(); e.currentTarget.classList.add("dragover"); } }
-function onRowDragLeave(e,productId){ e.currentTarget.classList.remove("dragover"); }
+function dragHasFiles(e){
+  return e.dataTransfer && Array.from(e.dataTransfer.types||[]).includes("Files");
+}
+function onRowDragOver(e,productId){
+  if(dragImage){ e.preventDefault(); e.currentTarget.classList.add("dragover"); }
+  else if(dragHasFiles(e)){ e.preventDefault(); e.currentTarget.classList.add("dropfiles"); }
+}
+function onRowDragLeave(e,productId){ e.currentTarget.classList.remove("dragover"); e.currentTarget.classList.remove("dropfiles"); }
 async function onRowDrop(e,targetId){
-  e.preventDefault(); e.currentTarget.classList.remove("dragover");
+  e.preventDefault();
+  e.currentTarget.classList.remove("dragover");
+  e.currentTarget.classList.remove("dropfiles");
+  // 1) ¿Arrastraron archivos desde la computadora? -> subir
+  if(dragHasFiles(e)){
+    await uploadFilesTo(targetId, Array.from(e.dataTransfer.files));
+    return;
+  }
+  // 2) Reasignar fotos existentes ya seleccionadas/arrastradas
   if(!imgSelection.length) return;
   if(imgSelection[0].productId===targetId){ imgSelection=[]; renderImages(); return; }
   await doMove(targetId);
@@ -386,6 +413,55 @@ async function doMove(targetId){
     imgSelection=[];
     await reloadImages();
   }catch(err){ toast(err.message); }
+}
+
+/* ---- Subir fotos nuevas a R2 ---- */
+function triggerUpload(pid){
+  uploadProductId = pid;
+  const inp = document.getElementById("uploadInput");
+  inp.value = "";       // permite volver a elegir el mismo archivo
+  inp.click();
+}
+async function onFilesPicked(e){
+  const files = Array.from(e.target.files||[]);
+  if(!files.length || !uploadProductId) return;
+  const pid = uploadProductId;
+  uploadProductId = null;
+  await uploadFilesTo(pid, files);
+}
+// Sube una imagen individual: manda los bytes crudos con su Content-Type real.
+// El proxy (Pages Function) reenvía el cuerpo con arrayBuffer(), así que la
+// imagen llega intacta al Worker, que la guarda en R2 y registra la fila.
+async function uploadImage(productId, file){
+  const res = await fetch(API+`/api/admin/products/${productId}/upload-image`, {
+    method: "POST",
+    headers: { "Content-Type": file.type || "image/jpeg" },
+    credentials: "include",
+    body: file,
+  });
+  if(res.status===401) throw new Error("Sesión no autorizada. Recarga e inicia sesión de nuevo.");
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || "Error al subir");
+  return data;
+}
+async function uploadFilesTo(pid, files){
+  const imgs = files.filter(f=>f.type && f.type.startsWith("image/"));
+  if(!imgs.length){ toast("Selecciona archivos de imagen (JPG, PNG, WEBP…)"); return; }
+  const addCell = document.getElementById("add-"+pid);
+  if(addCell) addCell.classList.add("busy");
+  toast(imgs.length>1 ? `Subiendo ${imgs.length} fotos…` : "Subiendo foto…");
+  let okCount=0;
+  for(const file of imgs){
+    if(file.size > 10*1024*1024){ toast(`«${file.name}» supera 10 MB, omitida`); continue; }
+    try{
+      const r = await uploadImage(pid, file);
+      // Registrar en el historial para poder deshacer (Ctrl+Z)
+      pushHistory({type:"add", imageId:r.id, product_id:pid, url:r.url});
+      okCount++;
+    }catch(err){ toast("Error subiendo "+file.name+": "+err.message); }
+  }
+  if(okCount) toast(okCount>1 ? `${okCount} fotos subidas` : "Foto subida");
+  await reloadImages();
 }
 
 /* ---- Eliminar imagen ---- */
@@ -428,7 +504,7 @@ async function undo(){
       const r=await api(`/api/admin/images`,{method:"POST",body:JSON.stringify({product_id:d.product_id, url:d.url, variant_id:d.variant_id, sort_order:d.sort_order})});
       a.restoredId=r.id;
     }else if(a.type==="add"){
-      // deshacer un "agregar" = borrar la foto agregada
+      // deshacer un "agregar" = borrar la foto agregada (la fila; el archivo queda en R2)
       await api(`/api/admin/images/${a.imageId}`,{method:"DELETE"});
     }
     redoStack.push(a); updateUndoButtons();
@@ -449,6 +525,7 @@ async function redo(){
       const id = a.restoredId || a.deleted.id;
       await api(`/api/admin/images/${id}`,{method:"DELETE"});
     }else if(a.type==="add"){
+      // rehacer un "agregar" = volver a insertar la fila apuntando a la misma URL de R2
       const r=await api(`/api/admin/images`,{method:"POST",body:JSON.stringify({product_id:a.product_id, url:a.url})});
       a.imageId=r.id;
     }
@@ -521,6 +598,10 @@ async function saveCategory(){
     closeCategoryModal(); DATA=await api("/api/admin/products"); renderFilters(); renderStats(); renderTable();
   }catch(err){ errEl.textContent=err.message; }
 }
+
+// Evita que soltar una imagen fuera de un producto abra el archivo en el navegador
+window.addEventListener("dragover", e=>{ if(dragHasFiles(e)) e.preventDefault(); });
+window.addEventListener("drop", e=>{ if(dragHasFiles(e)) e.preventDefault(); });
 
 init();
 </script>
