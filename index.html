@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{ --vino:#6e1f2f; --vino-osc:#591824; --oro:#b8863b; --crema:#f8f3ea; --crema-2:#efe6d8;
-         --tinta:#2b2420; --tinta-suave:#6b5f52; --verde:#2f7d4f; --gris:#c9c1b4; }
+         --tinta:#2b2420; --tinta-suave:#6b5f52; --verde:#2f7d4f; --gris:#c9c1b4; --rojo:#b00020; }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--crema);color:var(--tinta);font-family:'Manrope',sans-serif;-webkit-font-smoothing:antialiased;}
   .serif{font-family:'Cormorant Garamond',serif;}
@@ -33,13 +33,11 @@
   .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
   .chip{padding:6px 14px;border-radius:30px;border:1.5px solid rgba(110,31,47,0.3);background:transparent;color:var(--vino);font-size:12px;font-weight:600;cursor:pointer;}
   .chip.active{background:var(--vino);color:var(--crema);border-color:var(--vino);}
-  /* Barra de acciones en lote */
   .bulkbar{position:sticky;top:0;z-index:20;display:none;align-items:center;gap:12px;flex-wrap:wrap;background:var(--vino);color:var(--crema);padding:10px 16px;border-radius:8px;margin-bottom:16px;}
   .bulkbar.show{display:flex;}
   .bulkbar b{color:#fff;}
   .bulkbar .btn{background:#fff;color:var(--vino);}
   .bulkbar .btn.dark{background:var(--vino-osc);color:#fff;}
-  /* Tabla catálogo */
   table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(43,36,32,0.08);}
   th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--crema-2);font-size:14px;vertical-align:middle;}
   th{background:var(--crema-2);font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--tinta-suave);}
@@ -47,6 +45,8 @@
   .pthumb{width:46px;height:46px;border-radius:6px;object-fit:cover;background:var(--crema-2);}
   .pname{font-weight:600;}
   .pcat{font-size:12px;color:var(--oro);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+  .meta{font-size:12px;color:var(--tinta-suave);}
+  .meta .soldout{color:var(--rojo);font-weight:700;}
   .switch{position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;}
   .switch input{opacity:0;width:0;height:0;}
   .slider{position:absolute;inset:0;background:var(--gris);border-radius:24px;transition:.2s;}
@@ -55,7 +55,6 @@
   .switch input:checked + .slider:before{transform:translateX(20px);}
   .link-btn{background:none;border:none;color:var(--vino);font-weight:600;cursor:pointer;font-size:13px;text-decoration:underline;padding:0;}
   input[type=checkbox].pick{width:17px;height:17px;cursor:pointer;accent-color:var(--vino);}
-  /* Vista imágenes */
   .hint{font-size:13px;color:var(--tinta-suave);max-width:680px;margin:0 0 16px;line-height:1.5;}
   .imgsel{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
   .imgsel .tag{font-size:13px;color:var(--vino);font-weight:600;}
@@ -76,13 +75,11 @@
   .imgcell.sel .check{display:flex;}
   .imgcell .imgdel{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:rgba(43,36,32,0.78);color:#fff;border:none;font-size:13px;line-height:1;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0;}
   .imgcell:hover .imgdel{display:flex;}
-  /* Celda para subir foto nueva */
   .imgcell.imgadd{display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed var(--oro);background:transparent;color:var(--oro);cursor:pointer;font-size:12px;font-weight:700;text-align:center;line-height:1.25;gap:2px;}
   .imgcell.imgadd:hover{background:rgba(184,134,59,0.10);}
   .imgcell.imgadd .plus{font-size:26px;font-weight:400;line-height:1;}
   .imgcell.imgadd.busy{opacity:.6;cursor:progress;border-style:solid;}
   .nofotos{font-size:13px;color:var(--tinta-suave);font-style:italic;align-self:center;}
-  /* Modal */
   .overlay{position:fixed;inset:0;background:rgba(43,36,32,0.5);display:none;z-index:50;align-items:center;justify-content:center;padding:20px;}
   .overlay.open{display:flex;}
   .modal{background:var(--crema);border-radius:10px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;padding:28px;}
@@ -92,6 +89,24 @@
   .field input,.field textarea,.field select{width:100%;padding:10px 12px;border:1px solid var(--gris);border-radius:6px;font-family:inherit;font-size:14px;background:#fff;}
   .field textarea{min-height:90px;resize:vertical;}
   .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;}
+  .varsec{border-top:1px solid rgba(184,134,59,0.35);padding-top:18px;margin-top:4px;}
+  .varsec .lbl{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:600;margin:0 0 6px;}
+  .varsec .sub{font-size:12px;color:var(--tinta-suave);margin:0 0 14px;line-height:1.5;}
+  .vrow{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--crema-2);border-radius:6px;padding:8px 10px;margin-bottom:8px;}
+  .vrow.sold{border-color:#e0b4b4;}
+  .vrow .vname{flex:1;min-width:80px;border:1px solid transparent;border-radius:4px;padding:6px 7px;font-family:inherit;font-size:14px;font-weight:600;background:transparent;color:var(--tinta);}
+  .vrow .vname:hover{border-color:var(--crema-2);}
+  .vrow .vname:focus{border-color:var(--gris);background:#fff;outline:none;}
+  .vrow .soldtag{font-size:10px;font-weight:700;color:var(--rojo);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;}
+  .vrow .vstocklbl{font-size:11px;color:var(--tinta-suave);}
+  .vrow .vstock{width:56px;text-align:center;border:1px solid var(--gris);border-radius:4px;padding:6px;font-family:inherit;font-size:13px;}
+  .vrow .vdel{border:none;background:none;color:var(--tinta-suave);font-size:12px;text-decoration:underline;cursor:pointer;white-space:nowrap;}
+  .vrow .vdel:hover{color:var(--rojo);}
+  .varadd{display:flex;align-items:center;gap:8px;background:#fff;border:1px dashed var(--oro);border-radius:6px;padding:8px 10px;margin-top:12px;}
+  .varadd input{border:1px solid var(--gris);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;}
+  .varadd input.vn{flex:1;min-width:80px;}
+  .varadd input.vs{width:66px;text-align:center;}
+  .varempty{font-size:13px;color:var(--tinta-suave);margin:0 0 4px;}
   .loading{text-align:center;padding:60px 20px;color:var(--tinta-suave);}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--tinta);color:var(--crema);padding:12px 20px;border-radius:8px;font-size:14px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none;}
   .toast.show{opacity:1;}
@@ -119,7 +134,6 @@
   <button class="tab" id="tab-img" onclick="switchTab('img')">Imágenes</button>
 </div>
 
-<!-- ============ PESTAÑA CATÁLOGO ============ -->
 <div class="wrap" id="view-cat">
   <div class="toolbar">
     <input class="search" id="search" placeholder="Buscar por nombre…" oninput="renderTable()">
@@ -141,7 +155,6 @@
   <div id="tableWrap"><div class="loading">Cargando catálogo…</div></div>
 </div>
 
-<!-- ============ PESTAÑA IMÁGENES ============ -->
 <div class="wrap" id="view-img" style="display:none">
   <p class="hint">Para <b>subir una foto nueva</b>: usa la casilla punteada “＋ Foto” en cada producto, o arrastra imágenes desde tu computadora y suéltalas sobre el producto. Para <b>reasignar</b> una foto existente: arrástrala sobre otro producto, o selecciónala (varias con Ctrl/Cmd+clic) y usa “Mover selección a…”. El botón × elimina una foto.</p>
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
@@ -157,10 +170,8 @@
   <div id="imagesWrap"><div class="loading">Cargando…</div></div>
 </div>
 
-<!-- Input de archivo oculto, compartido para todas las subidas -->
 <input type="file" id="uploadInput" accept="image/*" multiple style="display:none" onchange="onFilesPicked(event)">
 
-<!-- Modal producto -->
 <div class="overlay" id="prodOverlay">
   <div class="modal">
     <h3 id="prodModalTitle" class="serif">Editar producto</h3>
@@ -169,16 +180,31 @@
     <div class="field"><label>Categoría</label><select id="f_cat"></select></div>
     <div class="field"><label>Precio (MXN)</label><input id="f_price" type="number" min="0"></div>
     <div class="field"><label>Descripción</label><textarea id="f_desc"></textarea></div>
-    <div class="field"><label>Existencias (opcional, normalmente 1)</label><input id="f_stock" type="number" min="0" placeholder="vacío = no mostrar"></div>
+    <div class="field"><label>Existencias del producto (solo si NO tiene variantes; normalmente 1)</label><input id="f_stock" type="number" min="0" placeholder="vacío = no mostrar"></div>
+
+    <div class="varsec" id="variantsSection" style="display:none">
+      <div class="lbl serif">Variantes y stock</div>
+      <p class="sub">Escribe cada combinación tal como quieres venderla (ej. “Rosa - L”, “Azul - XL”). Si el producto no tiene variantes, deja esto vacío y se vende como pieza única con las existencias de arriba.</p>
+      <div id="variantsList"></div>
+      <div class="varadd">
+        <input class="vn" id="newVarName" placeholder="Nombre (ej. Azul - XL)">
+        <input class="vs" id="newVarStock" type="number" min="0" placeholder="stock">
+        <button class="btn btn-primary" style="padding:8px 14px" onclick="addVariant()">Agregar</button>
+      </div>
+      <div class="err" id="varErr"></div>
+    </div>
+    <div class="field" id="variantsNote" style="display:none">
+      <p style="font-size:12px;color:var(--tinta-suave);margin:0;font-style:italic">Guarda el producto primero; luego ábrelo de nuevo para agregar variantes y su stock.</p>
+    </div>
+
     <div class="err" id="prodErr"></div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeProductModal()">Cancelar</button>
+      <button class="btn btn-ghost" onclick="closeProductModal()">Cerrar</button>
       <button class="btn btn-primary" id="prodSaveBtn" onclick="saveProduct()">Guardar</button>
     </div>
   </div>
 </div>
 
-<!-- Modal categoría -->
 <div class="overlay" id="catOverlay">
   <div class="modal" style="max-width:420px">
     <h3 class="serif">Nueva categoría</h3>
@@ -194,14 +220,14 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const API = ""; // mismo dominio: la Pages Function en /api/* reenvía al Worker
+const API = "";
 let DATA = { products: [], categories: [] };
 let activeCat = "Todos";
 let editingId = null;
-let picks = new Set();              // ids de productos seleccionados (catálogo)
-let imgSelection = [];             // [{productId, imageId, url}] selección de fotos
-let dragImage = null;             // {productId, imageId} arrastrada
-let uploadProductId = null;       // producto destino de la subida en curso
+let picks = new Set();
+let imgSelection = [];
+let dragImage = null;
+let uploadProductId = null;
 
 async function api(path, opts={}){
   const res = await fetch(API+path, {
@@ -215,9 +241,9 @@ async function api(path, opts={}){
   return data;
 }
 function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function cleanInt(v){ const n=Math.floor(Number(v)); return isNaN(n)||n<0?0:n; }
 function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
 
-/* ---- Pestañas ---- */
 function switchTab(t){
   document.getElementById("tab-cat").classList.toggle("active", t==="cat");
   document.getElementById("tab-img").classList.toggle("active", t==="img");
@@ -226,7 +252,6 @@ function switchTab(t){
   if(t==="img") renderImages();
 }
 
-/* ---- Carga ---- */
 async function init(){
   try{
     api("/api/admin/me").then(me=>{ document.getElementById("who").textContent = me.email; }).catch(()=>{});
@@ -248,13 +273,19 @@ function renderFilters(){
 }
 function setCat(n){ activeCat=n; renderFilters(); renderTable(); }
 
-/* ---- CATÁLOGO: tabla con selección múltiple ---- */
 function filteredProducts(){
   const q=(document.getElementById("search").value||"").toLowerCase();
   let list=DATA.products;
   if(activeCat!=="Todos") list=list.filter(p=>p.category===activeCat);
   if(q) list=list.filter(p=>p.name.toLowerCase().includes(q));
   return list;
+}
+function variantMeta(p){
+  const vars = p.variants||[];
+  if(!vars.length) return "";
+  const allSold = vars.every(v=>v.stock<=0);
+  const label = `${vars.length} var`;
+  return allSold ? ` · <span class="soldout">${label} · agotadas</span>` : ` · <span>${label}</span>`;
 }
 function renderTable(){
   const list=filteredProducts();
@@ -267,7 +298,7 @@ function renderTable(){
       <td>${img}</td>
       <td><div class="pname">${esc(p.name)}</div><div class="pcat">${esc(p.category)}</div></td>
       <td class="hide-sm">$${p.price}</td>
-      <td class="hide-sm">${p.images.length} 📷</td>
+      <td class="hide-sm"><span class="meta">${p.images.length} 📷${variantMeta(p)}</span></td>
       <td><label class="switch"><input type="checkbox" ${p.disponible?'checked':''} onchange="toggle('${p.id}',this.checked)"><span class="slider"></span></label></td>
       <td><button class="link-btn" onclick="openProductModal('${p.id}')">Editar</button></td>
     </tr>`;
@@ -275,7 +306,7 @@ function renderTable(){
   document.getElementById("tableWrap").innerHTML =
     `<table><thead><tr>
        <th><input type="checkbox" class="pick" ${allPicked?'checked':''} onchange="pickAll(this.checked)"></th>
-       <th></th><th>Producto</th><th class="hide-sm">Precio</th><th class="hide-sm">Fotos</th><th>Visible</th><th>Acciones</th>
+       <th></th><th>Producto</th><th class="hide-sm">Precio</th><th class="hide-sm">Fotos / Variantes</th><th>Visible</th><th>Acciones</th>
      </tr></thead><tbody>${rows}</tbody></table>`;
   renderBulkbar();
 }
@@ -305,7 +336,6 @@ async function toggle(id,val){
   }catch(err){ toast(err.message); renderTable(); }
 }
 
-/* ---- IMÁGENES: vista visual con drag-and-drop + selección + dropdown ---- */
 function imgFiltered(){
   const q=(document.getElementById("imgsearch").value||"").toLowerCase();
   return q?DATA.products.filter(p=>p.name.toLowerCase().includes(q)):DATA.products;
@@ -335,7 +365,6 @@ function renderImages(){
                 <button class="imgdel" title="Eliminar foto" onclick="deleteImage(event,'${p.id}',${im.id},'${esc(im.url)}')">×</button>
               </div>`;
     }).join("");
-    // Celda punteada para subir foto nueva a este producto
     const addCell = `<div class="imgcell imgadd" id="add-${p.id}" title="Subir foto nueva" onclick="triggerUpload('${p.id}')">
                        <span class="plus">＋</span><span>Foto</span>
                      </div>`;
@@ -354,13 +383,11 @@ function renderImgSel(){
 }
 function clearImgSelection(){ imgSelection=[]; renderImages(); }
 
-/* selección por clic (Ctrl/Cmd = múltiple, mismo producto) */
 function onImgClick(e,productId,imageId,url){
   e.preventDefault();
   const multi = e.ctrlKey||e.metaKey;
   const exists = imgSelection.some(s=>s.imageId===imageId);
   if(multi){
-    // solo permite seleccionar fotos del mismo producto
     if(imgSelection.length && imgSelection[0].productId!==productId) imgSelection=[];
     if(exists) imgSelection=imgSelection.filter(s=>s.imageId!==imageId);
     else imgSelection.push({productId,imageId,url});
@@ -369,9 +396,7 @@ function onImgClick(e,productId,imageId,url){
   }
   renderImages();
 }
-/* drag and drop (reasignar fotos existentes) */
 function onImgDragStart(e,productId,imageId){
-  // si arrastras una foto seleccionada, mueve toda la selección; si no, solo esa
   if(!imgSelection.some(s=>s.imageId===imageId)) imgSelection=[{productId,imageId,url:""}];
   dragImage=true;
   e.dataTransfer.effectAllowed="move";
@@ -389,12 +414,10 @@ async function onRowDrop(e,targetId){
   e.preventDefault();
   e.currentTarget.classList.remove("dragover");
   e.currentTarget.classList.remove("dropfiles");
-  // 1) ¿Arrastraron archivos desde la computadora? -> subir
   if(dragHasFiles(e)){
     await uploadFilesTo(targetId, Array.from(e.dataTransfer.files));
     return;
   }
-  // 2) Reasignar fotos existentes ya seleccionadas/arrastradas
   if(!imgSelection.length) return;
   if(imgSelection[0].productId===targetId){ imgSelection=[]; renderImages(); return; }
   await doMove(targetId);
@@ -415,11 +438,10 @@ async function doMove(targetId){
   }catch(err){ toast(err.message); }
 }
 
-/* ---- Subir fotos nuevas a R2 ---- */
 function triggerUpload(pid){
   uploadProductId = pid;
   const inp = document.getElementById("uploadInput");
-  inp.value = "";       // permite volver a elegir el mismo archivo
+  inp.value = "";
   inp.click();
 }
 async function onFilesPicked(e){
@@ -429,9 +451,6 @@ async function onFilesPicked(e){
   uploadProductId = null;
   await uploadFilesTo(pid, files);
 }
-// Sube una imagen individual: manda los bytes crudos con su Content-Type real.
-// El proxy (Pages Function) reenvía el cuerpo con arrayBuffer(), así que la
-// imagen llega intacta al Worker, que la guarda en R2 y registra la fila.
 async function uploadImage(productId, file){
   const res = await fetch(API+`/api/admin/products/${productId}/upload-image`, {
     method: "POST",
@@ -455,7 +474,6 @@ async function uploadFilesTo(pid, files){
     if(file.size > 10*1024*1024){ toast(`«${file.name}» supera 10 MB, omitida`); continue; }
     try{
       const r = await uploadImage(pid, file);
-      // Registrar en el historial para poder deshacer (Ctrl+Z)
       pushHistory({type:"add", imageId:r.id, product_id:pid, url:r.url});
       okCount++;
     }catch(err){ toast("Error subiendo "+file.name+": "+err.message); }
@@ -464,12 +482,10 @@ async function uploadFilesTo(pid, files){
   await reloadImages();
 }
 
-/* ---- Eliminar imagen ---- */
 async function deleteImage(e, productId, imageId, url){
   e.stopPropagation();
   try{
     const r = await api(`/api/admin/images/${imageId}`,{method:"DELETE"});
-    // guardamos los datos borrados para poder deshacer
     pushHistory({type:"delete", deleted:r.deleted});
     imgSelection = imgSelection.filter(s=>s.imageId!==imageId);
     toast("Foto eliminada");
@@ -477,7 +493,6 @@ async function deleteImage(e, productId, imageId, url){
   }catch(err){ toast(err.message); }
 }
 
-/* ---- Historial undo/redo (en memoria, solo esta sesión) ---- */
 let undoStack=[], redoStack=[];
 function pushHistory(action){ undoStack.push(action); redoStack=[]; updateUndoButtons(); }
 function updateUndoButtons(){
@@ -489,22 +504,16 @@ async function reloadImages(){
   renderStats(); renderImages();
   if(document.getElementById("view-cat").style.display!=="none") renderTable();
 }
-
 async function undo(){
   const a = undoStack.pop(); if(!a) return;
   try{
     if(a.type==="move"){
-      // regresar cada foto a su producto original
-      for(const mv of a.moved){
-        if(mv.from) await api(`/api/admin/images/${mv.imageId}/move`,{method:"POST",body:JSON.stringify({target_product_id:mv.from})});
-      }
+      for(const mv of a.moved){ if(mv.from) await api(`/api/admin/images/${mv.imageId}/move`,{method:"POST",body:JSON.stringify({target_product_id:mv.from})}); }
     }else if(a.type==="delete"){
-      // recrear la foto borrada; guardamos el nuevo id para poder rehacer
       const d=a.deleted;
       const r=await api(`/api/admin/images`,{method:"POST",body:JSON.stringify({product_id:d.product_id, url:d.url, variant_id:d.variant_id, sort_order:d.sort_order})});
       a.restoredId=r.id;
     }else if(a.type==="add"){
-      // deshacer un "agregar" = borrar la foto agregada (la fila; el archivo queda en R2)
       await api(`/api/admin/images/${a.imageId}`,{method:"DELETE"});
     }
     redoStack.push(a); updateUndoButtons();
@@ -512,20 +521,15 @@ async function undo(){
     await reloadImages();
   }catch(err){ toast("No se pudo deshacer: "+err.message); undoStack.push(a); updateUndoButtons(); }
 }
-
 async function redo(){
   const a = redoStack.pop(); if(!a) return;
   try{
     if(a.type==="move"){
-      for(const mv of a.moved){
-        await api(`/api/admin/images/${mv.imageId}/move`,{method:"POST",body:JSON.stringify({target_product_id:a.to})});
-      }
+      for(const mv of a.moved){ await api(`/api/admin/images/${mv.imageId}/move`,{method:"POST",body:JSON.stringify({target_product_id:a.to})}); }
     }else if(a.type==="delete"){
-      // rehacer un borrado = volver a borrar la foto restaurada
       const id = a.restoredId || a.deleted.id;
       await api(`/api/admin/images/${id}`,{method:"DELETE"});
     }else if(a.type==="add"){
-      // rehacer un "agregar" = volver a insertar la fila apuntando a la misma URL de R2
       const r=await api(`/api/admin/images`,{method:"POST",body:JSON.stringify({product_id:a.product_id, url:a.url})});
       a.imageId=r.id;
     }
@@ -535,15 +539,78 @@ async function redo(){
   }catch(err){ toast("No se pudo rehacer: "+err.message); redoStack.push(a); updateUndoButtons(); }
 }
 
-// Atajos de teclado
 window.addEventListener("keydown",(e)=>{
+  const tag = (e.target && e.target.tagName)||"";
+  if(tag==="INPUT" || tag==="TEXTAREA" || tag==="SELECT") return;
   const z = e.key==="z"||e.key==="Z";
   const y = e.key==="y"||e.key==="Y";
   if((e.ctrlKey||e.metaKey) && z && !e.shiftKey){ e.preventDefault(); undo(); }
   else if((e.ctrlKey||e.metaKey) && ((z && e.shiftKey) || y)){ e.preventDefault(); redo(); }
 });
 
-/* ---- Modal producto ---- */
+/* ===== VARIANTES (dentro del modal) ===== */
+function renderVariants(){
+  const list = document.getElementById("variantsList");
+  const p = DATA.products.find(x=>x.id===editingId);
+  const vars = (p && p.variants) || [];
+  if(!vars.length){
+    list.innerHTML = '<p class="varempty">Aún no hay variantes. Agrega la primera abajo, o deja vacío para vender como pieza única.</p>';
+    return;
+  }
+  list.innerHTML = vars.map(v=>{
+    const sold = v.stock<=0;
+    return `<div class="vrow ${sold?'sold':''}" data-vid="${v.id}">
+      <input class="vname" value="${esc(v.name)}" onblur="saveVariant('${v.id}')" onkeydown="if(event.key==='Enter')this.blur()">
+      ${sold?'<span class="soldtag">agotado</span>':''}
+      <span class="vstocklbl">stock</span>
+      <input class="vstock" type="number" min="0" value="${v.stock}" onblur="saveVariant('${v.id}')" onkeydown="if(event.key==='Enter')this.blur()">
+      <button class="vdel" onclick="deleteVariant('${v.id}')">borrar</button>
+    </div>`;
+  }).join("");
+}
+async function saveVariant(vid){
+  const row = document.querySelector(`.vrow[data-vid="${vid}"]`);
+  if(!row) return;
+  const name = row.querySelector(".vname").value.trim();
+  const stock = cleanInt(row.querySelector(".vstock").value);
+  const p = DATA.products.find(x=>x.id===editingId);
+  const v = p && p.variants.find(x=>x.id===vid);
+  if(!name){ toast("La variante necesita un nombre"); if(v) renderVariants(); return; }
+  if(v && v.name===name && Number(v.stock)===stock) return;
+  try{
+    const r = await api(`/api/admin/variants/${vid}`,{method:"PUT",body:JSON.stringify({name, stock})});
+    if(v){ v.name=r.name; v.stock=r.stock; }
+    renderVariants(); renderTable();
+    toast("Variante actualizada");
+  }catch(err){ toast(err.message); renderVariants(); }
+}
+async function addVariant(){
+  const nameEl=document.getElementById("newVarName"), stockEl=document.getElementById("newVarStock");
+  const name=nameEl.value.trim(), stock=stockEl.value;
+  const errEl=document.getElementById("varErr"); errEl.textContent="";
+  if(!name){ errEl.textContent="Escribe el nombre de la variante."; return; }
+  if(!editingId) return;
+  try{
+    const r=await api(`/api/admin/products/${editingId}/variants`,{method:"POST",body:JSON.stringify({name, stock})});
+    const p=DATA.products.find(x=>x.id===editingId);
+    if(p){ (p.variants = p.variants||[]).push({id:r.id, name:r.name, stock:r.stock}); }
+    nameEl.value=""; stockEl.value="";
+    renderVariants(); renderTable();
+    toast("Variante agregada");
+    nameEl.focus();
+  }catch(err){ errEl.textContent=err.message; }
+}
+async function deleteVariant(vid){
+  if(!confirm("¿Eliminar esta variante? No se puede deshacer.")) return;
+  try{
+    await api(`/api/admin/variants/${vid}`,{method:"DELETE"});
+    const p=DATA.products.find(x=>x.id===editingId);
+    if(p&&p.variants){ p.variants=p.variants.filter(x=>x.id!==vid); }
+    renderVariants(); renderTable();
+    toast("Variante eliminada");
+  }catch(err){ toast(err.message); }
+}
+
 function fillCatSelect(sel,selectedId){ sel.innerHTML=DATA.categories.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join(""); }
 function openProductModal(id){
   editingId=id||null; const isNew=!editingId;
@@ -551,6 +618,10 @@ function openProductModal(id){
   document.getElementById("f_id_wrap").style.display=isNew?"block":"none";
   document.getElementById("prodErr").textContent="";
   fillCatSelect(document.getElementById("f_cat"));
+  document.getElementById("variantsSection").style.display = isNew?"none":"block";
+  document.getElementById("variantsNote").style.display = isNew?"block":"none";
+  document.getElementById("varErr").textContent="";
+  document.getElementById("newVarName").value=""; document.getElementById("newVarStock").value="";
   if(isNew){ ["f_name","f_id","f_price","f_desc","f_stock"].forEach(i=>document.getElementById(i).value=""); }
   else{
     const p=DATA.products.find(x=>x.id===editingId);
@@ -559,10 +630,11 @@ function openProductModal(id){
     document.getElementById("f_price").value=p.price;
     document.getElementById("f_desc").value=p.description||"";
     document.getElementById("f_stock").value=(p.stock??"");
+    renderVariants();
   }
   document.getElementById("prodOverlay").classList.add("open");
 }
-function closeProductModal(){ document.getElementById("prodOverlay").classList.remove("open"); }
+function closeProductModal(){ document.getElementById("prodOverlay").classList.remove("open"); editingId=null; }
 async function saveProduct(){
   const btn=document.getElementById("prodSaveBtn"), errEl=document.getElementById("prodErr"); errEl.textContent="";
   const payload={
@@ -579,7 +651,7 @@ async function saveProduct(){
     else{
       payload.id=document.getElementById("f_id").value.trim();
       if(!payload.id){ errEl.textContent="El ID es obligatorio."; btn.disabled=false; return; }
-      await api(`/api/admin/products`,{method:"POST",body:JSON.stringify(payload)}); toast("Producto creado");
+      await api(`/api/admin/products`,{method:"POST",body:JSON.stringify(payload)}); toast("Producto creado. Ábrelo de nuevo para agregar variantes.");
     }
     closeProductModal();
     DATA=await api("/api/admin/products"); renderFilters(); renderStats(); renderTable();
@@ -587,7 +659,6 @@ async function saveProduct(){
   btn.disabled=false;
 }
 
-/* ---- Modal categoría ---- */
 function openCategoryModal(){ document.getElementById("c_name").value=""; document.getElementById("catErr").textContent=""; document.getElementById("catOverlay").classList.add("open"); }
 function closeCategoryModal(){ document.getElementById("catOverlay").classList.remove("open"); }
 async function saveCategory(){
@@ -599,7 +670,6 @@ async function saveCategory(){
   }catch(err){ errEl.textContent=err.message; }
 }
 
-// Evita que soltar una imagen fuera de un producto abra el archivo en el navegador
 window.addEventListener("dragover", e=>{ if(dragHasFiles(e)) e.preventDefault(); });
 window.addEventListener("drop", e=>{ if(dragHasFiles(e)) e.preventDefault(); });
 
