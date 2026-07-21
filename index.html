@@ -688,7 +688,10 @@ function renderOrders(){
         </div>
         <button class="btn btn-primary" style="padding:9px 16px" onclick="saveOrderShipping(${o.id})">Guardar</button>
       </div>
-      ${trackLine}` : `<div style="font-size:12px;color:var(--tinta-suave);font-style:italic">La gestión de envío se habilita cuando el pago está confirmado.</div>`}
+      ${trackLine}` : `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--tinta-suave);font-style:italic">La gestión de envío se habilita cuando el pago está confirmado.</span>
+        ${o.payment_status==="pending" ? `<button class="btn btn-ghost" style="padding:7px 14px;font-size:12px" onclick="markPaid(${o.id})">✓ Marcar como pagado</button>` : ""}
+      </div>`}
     </div>`;
   }).join("");
 }
@@ -705,6 +708,15 @@ async function saveOrderShipping(id){
     if(o){ o.shipping_status=r.shipping_status; o.carrier=r.carrier; o.tracking_number=r.tracking_number; o.eta=r.eta; o.shipped_at=r.shipped_at; }
     renderOrdStats(); renderOrders();
     toast("Pedido actualizado");
+  }catch(err){ toast(err.message); }
+}
+async function markPaid(id){
+  if(!confirm("¿Marcar este pedido como PAGADO? Esto descontará el stock de sus productos. Úsalo solo si confirmaste el pago por otra vía.")) return;
+  try{
+    await api(`/api/admin/orders/${id}/mark-paid`,{method:"POST"});
+    toast("Pedido marcado como pagado");
+    await loadOrders();               // recargar pedidos
+    DATA = await api("/api/admin/products"); // refrescar stock en memoria
   }catch(err){ toast(err.message); }
 }
 
