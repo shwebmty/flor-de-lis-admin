@@ -111,6 +111,33 @@
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--tinta);color:var(--crema);padding:12px 20px;border-radius:8px;font-size:14px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none;}
   .toast.show{opacity:1;}
   .err{color:var(--vino);font-size:13px;margin-top:6px;}
+  /* Pedidos */
+  .ofilters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+  .ocard{background:#fff;border:1px solid rgba(184,134,59,0.3);border-radius:8px;padding:18px;margin-bottom:14px;}
+  .ocard-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  .ocard-head .oid{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;}
+  .ocard-head .odate{font-size:12px;color:var(--tinta-suave);}
+  .obadges{display:flex;gap:8px;flex-wrap:wrap;}
+  .obadge{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:4px 10px;border-radius:20px;}
+  .pay-paid{background:#e4f2ea;color:#2f7d4f;}
+  .pay-pending{background:#faf0d7;color:#96731f;}
+  .pay-rejected,.pay-error{background:#f6e0e0;color:#b00020;}
+  .ship-pending{background:var(--crema-2);color:var(--tinta-suave);}
+  .ship-preparing{background:#e6eef7;color:#2b5e91;}
+  .ship-shipped{background:#e9e2f3;color:#5b3d91;}
+  .ship-delivered{background:#e4f2ea;color:#2f7d4f;}
+  .ocust{font-size:13px;color:var(--tinta-suave);margin-bottom:10px;line-height:1.6;}
+  .ocust b{color:var(--tinta);}
+  .oitems{background:var(--crema);border-radius:6px;padding:10px 12px;margin-bottom:12px;}
+  .oitem{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:3px 0;}
+  .oitem .oq{color:var(--oro);font-weight:700;}
+  .ototal{display:flex;justify-content:space-between;font-weight:700;font-size:15px;border-top:1px solid rgba(184,134,59,0.3);margin-top:6px;padding-top:8px;}
+  .oship{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:var(--crema);border-radius:6px;padding:12px;}
+  .oship .fld{display:flex;flex-direction:column;gap:4px;}
+  .oship .fld label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--tinta-suave);}
+  .oship select,.oship input{padding:8px 10px;border:1px solid var(--gris);border-radius:5px;font-family:inherit;font-size:13px;background:#fff;}
+  .oship input{width:140px;}
+  .oempty{text-align:center;color:var(--tinta-suave);padding:50px 20px;}
   @media(max-width:640px){ .hide-sm{display:none;} th,td{padding:9px 7px;} }
 </style>
 </head>
@@ -132,6 +159,7 @@
 <div class="tabs">
   <button class="tab active" id="tab-cat" onclick="switchTab('cat')">Catálogo</button>
   <button class="tab" id="tab-img" onclick="switchTab('img')">Imágenes</button>
+  <button class="tab" id="tab-ord" onclick="switchTab('ord')">Pedidos</button>
 </div>
 
 <div class="wrap" id="view-cat">
@@ -168,6 +196,16 @@
   </div>
   <input class="search" id="imgsearch" placeholder="Buscar producto…" style="max-width:360px;margin-bottom:20px" oninput="renderImages()">
   <div id="imagesWrap"><div class="loading">Cargando…</div></div>
+</div>
+
+<!-- ============ PESTAÑA PEDIDOS ============ -->
+<div class="wrap" id="view-ord" style="display:none">
+  <div class="toolbar">
+    <div class="stats" id="ordStats" style="margin:0"></div>
+    <button class="btn btn-ghost" onclick="loadOrders()">↻ Actualizar</button>
+  </div>
+  <div class="ofilters" id="ordFilters"></div>
+  <div id="ordersWrap"><div class="loading">Cargando pedidos…</div></div>
 </div>
 
 <input type="file" id="uploadInput" accept="image/*" multiple style="display:none" onchange="onFilesPicked(event)">
@@ -247,9 +285,12 @@ function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg
 function switchTab(t){
   document.getElementById("tab-cat").classList.toggle("active", t==="cat");
   document.getElementById("tab-img").classList.toggle("active", t==="img");
+  document.getElementById("tab-ord").classList.toggle("active", t==="ord");
   document.getElementById("view-cat").style.display = t==="cat"?"block":"none";
   document.getElementById("view-img").style.display = t==="img"?"block":"none";
+  document.getElementById("view-ord").style.display = t==="ord"?"block":"none";
   if(t==="img") renderImages();
+  if(t==="ord") loadOrders();
 }
 
 async function init(){
@@ -547,6 +588,125 @@ window.addEventListener("keydown",(e)=>{
   if((e.ctrlKey||e.metaKey) && z && !e.shiftKey){ e.preventDefault(); undo(); }
   else if((e.ctrlKey||e.metaKey) && ((z && e.shiftKey) || y)){ e.preventDefault(); redo(); }
 });
+
+/* ===== PEDIDOS ===== */
+let ORDERS = [];
+let ordFilter = "todos";
+const PAY_LABEL = { paid:"Pagado", pending:"Pago pendiente", rejected:"Rechazado", error:"Error de pago" };
+const SHIP_LABEL = { pending:"Por preparar", preparing:"Preparando", shipped:"Enviado", delivered:"Entregado" };
+const SHIP_NEXT = ["pending","preparing","shipped","delivered"];
+
+async function loadOrders(){
+  const wrap = document.getElementById("ordersWrap");
+  wrap.innerHTML = '<div class="loading">Cargando pedidos…</div>';
+  try{
+    const data = await api("/api/admin/orders");
+    ORDERS = data.orders || [];
+    renderOrdStats(); renderOrdFilters(); renderOrders();
+  }catch(err){
+    wrap.innerHTML = '<div class="oempty">'+esc(err.message)+'</div>';
+  }
+}
+function renderOrdStats(){
+  const total = ORDERS.length;
+  const pagados = ORDERS.filter(o=>o.payment_status==="paid").length;
+  const porEnviar = ORDERS.filter(o=>o.payment_status==="paid" && o.shipping_status==="pending").length;
+  document.getElementById("ordStats").innerHTML =
+    `<span><b>${total}</b> pedidos</span><span><b>${pagados}</b> pagados</span><span><b>${porEnviar}</b> por enviar</span>`;
+}
+function renderOrdFilters(){
+  const opts = [["todos","Todos"],["paid","Pagados"],["pending","Pendientes"],["por_enviar","Por enviar"],["rejected","Rechazados"]];
+  document.getElementById("ordFilters").innerHTML = opts.map(([k,label])=>
+    `<button class="chip ${ordFilter===k?'active':''}" onclick="setOrdFilter('${k}')">${label}</button>`).join("");
+}
+function setOrdFilter(k){ ordFilter=k; renderOrdFilters(); renderOrders(); }
+function filteredOrders(){
+  if(ordFilter==="todos") return ORDERS;
+  if(ordFilter==="por_enviar") return ORDERS.filter(o=>o.payment_status==="paid" && o.shipping_status==="pending");
+  if(ordFilter==="paid") return ORDERS.filter(o=>o.payment_status==="paid");
+  if(ordFilter==="pending") return ORDERS.filter(o=>o.payment_status==="pending");
+  if(ordFilter==="rejected") return ORDERS.filter(o=>o.payment_status==="rejected"||o.payment_status==="error");
+  return ORDERS;
+}
+function fmtDate(s){
+  if(!s) return "";
+  const d = new Date(s.includes("T")?s:s.replace(" ","T")+"Z");
+  if(isNaN(d)) return s;
+  return d.toLocaleString("es-MX",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+function renderOrders(){
+  const list = filteredOrders();
+  const wrap = document.getElementById("ordersWrap");
+  if(!list.length){ wrap.innerHTML = '<div class="oempty">No hay pedidos en esta vista.</div>'; return; }
+  wrap.innerHTML = list.map(o=>{
+    const pcls = "pay-"+(o.payment_status||"pending");
+    const scls = "ship-"+(o.shipping_status||"pending");
+    const items = (o.items||[]).map(it=>
+      `<div class="oitem"><span><span class="oq">${it.qty}×</span> ${esc(it.name)}</span><span>$${(it.unit_price||0)*(it.qty||1)}</span></div>`
+    ).join("");
+    const canShip = o.payment_status==="paid";
+    const trackLine = o.tracking_number ? `<div style="font-size:12px;color:var(--tinta-suave);margin-top:8px">Guía: <b>${esc(o.tracking_number)}</b>${o.carrier?` · ${esc(o.carrier)}`:''}${o.shipped_at?` · enviado ${fmtDate(o.shipped_at)}`:''}</div>` : "";
+    return `<div class="ocard">
+      <div class="ocard-head">
+        <div>
+          <div class="oid">Pedido #${o.id}</div>
+          <div class="odate">${fmtDate(o.created_at)}</div>
+        </div>
+        <div class="obadges">
+          <span class="obadge ${pcls}">${PAY_LABEL[o.payment_status]||o.payment_status}</span>
+          <span class="obadge ${scls}">${SHIP_LABEL[o.shipping_status]||o.shipping_status}</span>
+        </div>
+      </div>
+      <div class="ocust">
+        <b>${esc(o.customer_name||"—")}</b><br>
+        ${o.customer_email?`✉ ${esc(o.customer_email)}<br>`:""}
+        ${o.customer_phone?`✆ ${esc(o.customer_phone)}`:""}
+      </div>
+      <div class="oitems">
+        ${items||'<div class="oitem">Sin artículos</div>'}
+        <div class="ototal"><span>Total</span><span>$${o.total}</span></div>
+      </div>
+      ${canShip ? `
+      <div class="oship">
+        <div class="fld">
+          <label>Estado de envío</label>
+          <select id="ship-${o.id}">
+            ${SHIP_NEXT.map(s=>`<option value="${s}" ${o.shipping_status===s?'selected':''}>${SHIP_LABEL[s]}</option>`).join("")}
+          </select>
+        </div>
+        <div class="fld">
+          <label>Paquetería (opcional)</label>
+          <input id="carrier-${o.id}" value="${esc(o.carrier||'')}" placeholder="Estafeta, DHL…">
+        </div>
+        <div class="fld">
+          <label>Guía (opcional)</label>
+          <input id="track-${o.id}" value="${esc(o.tracking_number||'')}" placeholder="Nº de rastreo">
+        </div>
+        <div class="fld">
+          <label>Entrega estimada (opcional)</label>
+          <input id="eta-${o.id}" value="${esc(o.eta||'')}" placeholder="Ej. 3-5 días">
+        </div>
+        <button class="btn btn-primary" style="padding:9px 16px" onclick="saveOrderShipping(${o.id})">Guardar</button>
+      </div>
+      ${trackLine}` : `<div style="font-size:12px;color:var(--tinta-suave);font-style:italic">La gestión de envío se habilita cuando el pago está confirmado.</div>`}
+    </div>`;
+  }).join("");
+}
+async function saveOrderShipping(id){
+  const payload = {
+    shipping_status: document.getElementById("ship-"+id).value,
+    carrier: document.getElementById("carrier-"+id).value.trim(),
+    tracking_number: document.getElementById("track-"+id).value.trim(),
+    eta: document.getElementById("eta-"+id).value.trim(),
+  };
+  try{
+    const r = await api(`/api/admin/orders/${id}`,{method:"PUT",body:JSON.stringify(payload)});
+    const o = ORDERS.find(x=>x.id===id);
+    if(o){ o.shipping_status=r.shipping_status; o.carrier=r.carrier; o.tracking_number=r.tracking_number; o.eta=r.eta; o.shipped_at=r.shipped_at; }
+    renderOrdStats(); renderOrders();
+    toast("Pedido actualizado");
+  }catch(err){ toast(err.message); }
+}
 
 /* ===== VARIANTES (dentro del modal) ===== */
 function renderVariants(){
