@@ -202,7 +202,10 @@
 <div class="wrap" id="view-ord" style="display:none">
   <div class="toolbar">
     <div class="stats" id="ordStats" style="margin:0"></div>
-    <button class="btn btn-ghost" onclick="loadOrders()">↻ Actualizar</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" onclick="testAvisos()">✉ Probar avisos</button>
+      <button class="btn btn-ghost" onclick="loadOrders()">↻ Actualizar</button>
+    </div>
   </div>
   <div class="ofilters" id="ordFilters"></div>
   <div id="ordersWrap"><div class="loading">Cargando pedidos…</div></div>
@@ -711,12 +714,19 @@ async function saveOrderShipping(id){
   }catch(err){ toast(err.message); }
 }
 async function markPaid(id){
-  if(!confirm("¿Marcar este pedido como PAGADO? Esto descontará el stock de sus productos. Úsalo solo si confirmaste el pago por otra vía.")) return;
+  if(!confirm("¿Marcar este pedido como PAGADO? Esto descontará el stock de sus productos y enviará los avisos. Úsalo solo si confirmaste el pago por otra vía.")) return;
   try{
     await api(`/api/admin/orders/${id}/mark-paid`,{method:"POST"});
     toast("Pedido marcado como pagado");
     await loadOrders();               // recargar pedidos
     DATA = await api("/api/admin/products"); // refrescar stock en memoria
+  }catch(err){ toast(err.message); }
+}
+async function testAvisos(){
+  toast("Enviando avisos de prueba…");
+  try{
+    const r = await api("/api/admin/test-avisos",{method:"POST"});
+    toast("Correo: "+(r.correo?"✓":"✗")+" · Telegram: "+(r.telegram?"✓":"✗"));
   }catch(err){ toast(err.message); }
 }
 
