@@ -687,6 +687,7 @@ function renderOrders(){
         ${o.customer_email?`✉ ${esc(o.customer_email)}<br>`:""}
         ${o.customer_phone?`✆ ${esc(o.customer_phone)}`:""}
       </div>
+      ${o.payment_status==="cancelled" && o.cancel_reason ? `<div style="font-size:12px;color:#a12525;background:#faf0f0;border-radius:6px;padding:8px 10px;margin-bottom:12px"><b>Nota interna de cancelación:</b> ${esc(o.cancel_reason)}</div>` : ""}
       <div class="oitems">
         ${items||'<div class="oitem">Sin artículos</div>'}
         <div class="ototal"><span>Total</span><span>$${o.total}</span></div>
@@ -767,12 +768,21 @@ async function editOrderEmail(id){
 async function cancelOrder(id){
   const o = ORDERS.find(x=>x.id===id);
   const eraPagado = o && o.payment_status==="paid";
+  // 1) Confirmación
   const msg = eraPagado
-    ? "¿Cancelar el pedido #"+id+"?\n\nEstaba PAGADO: se devolverá el stock de sus productos y se enviará un correo de cancelación al cliente."
-    : "¿Cancelar el pedido #"+id+"?\n\nSe enviará un correo de cancelación al cliente.";
+    ? "¿Realmente quieres cancelar el pedido #"+id+"?\n\nEstaba PAGADO: se devolverá el stock de sus productos y se enviará un correo de cancelación al cliente."
+    : "¿Realmente quieres cancelar el pedido #"+id+"?\n\nSe enviará un correo de cancelación al cliente.";
   if(!confirm(msg)) return;
+  // 2) Motivo para el CLIENTE (obligatorio: lo verá en el correo)
+  const motivo_cliente = prompt("Motivo de la cancelación que verá el CLIENTE (se incluirá en su correo):", "");
+  if(motivo_cliente===null) return; // canceló el prompt
+  if(!motivo_cliente.trim()){ toast("El motivo para el cliente es obligatorio"); return; }
+  // 3) Motivo INTERNO (opcional: solo para ti)
+  const motivo_interno = prompt("Motivo INTERNO (opcional, solo para ti — el cliente NO lo ve):", "");
+  if(motivo_interno===null) return; // canceló el prompt
   try{
-    const r = await api(`/api/admin/orders/${id}/cancel`,{method:"POST"});
+    const r = await api(`/api/admin/orders/${id}/cancel`,{method:"POST",
+      body:JSON.stringify({ motivo_cliente: motivo_cliente.trim(), motivo_interno: motivo_interno.trim() })});
     toast("Pedido cancelado"+(r.stock_devuelto?" · stock devuelto":"")+(r.correo&&r.correo.ok?" · correo enviado":""));
     await loadOrders();
     DATA = await api("/api/admin/products"); // refrescar stock en memoria
