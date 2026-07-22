@@ -138,6 +138,12 @@
   .oship select,.oship input{padding:8px 10px;border:1px solid var(--gris);border-radius:5px;font-family:inherit;font-size:13px;background:#fff;}
   .oship input{width:140px;}
   .oempty{text-align:center;color:var(--tinta-suave);padding:50px 20px;}
+  .oactions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--crema-2);}
+  .oact{border:1px solid var(--gris);background:#fff;color:var(--tinta);border-radius:6px;padding:7px 12px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;}
+  .oact:hover{border-color:var(--vino);color:var(--vino);}
+  .oact-danger{color:#a12525;border-color:#e0b4b4;}
+  .oact-danger:hover{background:#a12525;color:#fff;border-color:#a12525;}
+  .pay-cancelled{background:#eee;color:#888;}
   @media(max-width:640px){ .hide-sm{display:none;} th,td{padding:9px 7px;} }
 </style>
 </head>
@@ -206,6 +212,10 @@
       <button class="btn btn-ghost" onclick="testAvisos()">✉ Probar avisos</button>
       <button class="btn btn-ghost" onclick="loadOrders()">↻ Actualizar</button>
     </div>
+  </div>
+  <div style="display:flex;gap:6px;margin-bottom:12px">
+    <button class="chip active" id="ordView-activos" onclick="setOrdView('activos')">Activos</button>
+    <button class="chip" id="ordView-archivados" onclick="setOrdView('archivados')">📁 Archivados</button>
   </div>
   <div class="ofilters" id="ordFilters"></div>
   <div id="ordersWrap"><div class="loading">Cargando pedidos…</div></div>
@@ -595,7 +605,8 @@ window.addEventListener("keydown",(e)=>{
 /* ===== PEDIDOS ===== */
 let ORDERS = [];
 let ordFilter = "todos";
-const PAY_LABEL = { paid:"Pagado", pending:"Pago pendiente", rejected:"Rechazado", error:"Error de pago" };
+let ordView = "activos"; // "activos" o "archivados"
+const PAY_LABEL = { paid:"Pagado", pending:"Pago pendiente", rejected:"Rechazado", error:"Error de pago", cancelled:"Cancelado" };
 const SHIP_LABEL = { pending:"Por preparar", preparing:"Preparando", shipped:"Enviado", delivered:"Entregado" };
 const SHIP_NEXT = ["pending","preparing","shipped","delivered"];
 
@@ -603,22 +614,32 @@ async function loadOrders(){
   const wrap = document.getElementById("ordersWrap");
   wrap.innerHTML = '<div class="loading">Cargando pedidos…</div>';
   try{
-    const data = await api("/api/admin/orders");
+    const q = ordView==="archivados" ? "?archived=1" : "";
+    const data = await api("/api/admin/orders"+q);
     ORDERS = data.orders || [];
     renderOrdStats(); renderOrdFilters(); renderOrders();
   }catch(err){
     wrap.innerHTML = '<div class="oempty">'+esc(err.message)+'</div>';
   }
 }
+function setOrdView(v){
+  if(ordView===v) return;
+  ordView = v;
+  ordFilter = "todos";
+  document.getElementById("ordView-activos").classList.toggle("active", v==="activos");
+  document.getElementById("ordView-archivados").classList.toggle("active", v==="archivados");
+  loadOrders();
+}
 function renderOrdStats(){
   const total = ORDERS.length;
   const pagados = ORDERS.filter(o=>o.payment_status==="paid").length;
   const porEnviar = ORDERS.filter(o=>o.payment_status==="paid" && o.shipping_status==="pending").length;
+  const etiqueta = ordView==="archivados" ? "archivados" : "pedidos";
   document.getElementById("ordStats").innerHTML =
-    `<span><b>${total}</b> pedidos</span><span><b>${pagados}</b> pagados</span><span><b>${porEnviar}</b> por enviar</span>`;
+    `<span><b>${total}</b> ${etiqueta}</span><span><b>${pagados}</b> pagados</span><span><b>${porEnviar}</b> por enviar</span>`;
 }
 function renderOrdFilters(){
-  const opts = [["todos","Todos"],["paid","Pagados"],["pending","Pendientes"],["por_enviar","Por enviar"],["rejected","Rechazados"]];
+  const opts = [["todos","Todos"],["paid","Pagados"],["pending","Pendientes"],["por_enviar","Por enviar"],["rejected","Rechazados"],["cancelled","Cancelados"]];
   document.getElementById("ordFilters").innerHTML = opts.map(([k,label])=>
     `<button class="chip ${ordFilter===k?'active':''}" onclick="setOrdFilter('${k}')">${label}</button>`).join("");
 }
@@ -629,6 +650,7 @@ function filteredOrders(){
   if(ordFilter==="paid") return ORDERS.filter(o=>o.payment_status==="paid");
   if(ordFilter==="pending") return ORDERS.filter(o=>o.payment_status==="pending");
   if(ordFilter==="rejected") return ORDERS.filter(o=>o.payment_status==="rejected"||o.payment_status==="error");
+  if(ordFilter==="cancelled") return ORDERS.filter(o=>o.payment_status==="cancelled");
   return ORDERS;
 }
 function fmtDate(s){
@@ -695,8 +717,73 @@ function renderOrders(){
         <span style="font-size:12px;color:var(--tinta-suave);font-style:italic">La gestión de envío se habilita cuando el pago está confirmado.</span>
         ${o.payment_status==="pending" ? `<button class="btn btn-ghost" style="padding:7px 14px;font-size:12px" onclick="markPaid(${o.id})">✓ Marcar como pagado</button>` : ""}
       </div>`}
+      ${renderOrderActions(o)}
     </div>`;
   }).join("");
+}
+// Barra de acciones por pedido: reenviar correo, editar correo, cancelar, archivar/desarchivar.
+function renderOrderActions(o){
+  const cancelled = o.payment_status==="cancelled";
+  const btns = [];
+  // Reenviar correo del estatus actual (solo si hay correo y no está cancelado)
+  if(o.customer_email && !cancelled){
+    btns.push(`<button class="oact" onclick="resendEmail(${o.id})">✉ Reenviar correo de "${esc(SHIP_LABEL[o.shipping_status]||'confirmación')}"</button>`);
+  }
+  // Editar correo del cliente
+  btns.push(`<button class="oact" onclick="editOrderEmail(${o.id})">✎ Editar correo del cliente</button>`);
+  // Cancelar (si no está ya cancelado)
+  if(!cancelled){
+    btns.push(`<button class="oact oact-danger" onclick="cancelOrder(${o.id})">🚫 Cancelar pedido</button>`);
+  }
+  // Archivar / desarchivar
+  if(ordView==="archivados"){
+    btns.push(`<button class="oact" onclick="archiveOrder(${o.id},false)">↩ Desarchivar</button>`);
+  }else{
+    btns.push(`<button class="oact" onclick="archiveOrder(${o.id},true)">📁 Archivar pedido</button>`);
+  }
+  return `<div class="oactions">${btns.join("")}</div>`;
+}
+async function resendEmail(id){
+  toast("Reenviando correo…");
+  try{
+    const r = await api(`/api/admin/orders/${id}/resend-email`,{method:"POST"});
+    toast(r.ok ? "Correo reenviado ✓ ("+r.destinatario+")" : "No se pudo reenviar (status "+r.status+")");
+  }catch(err){ toast(err.message); }
+}
+async function editOrderEmail(id){
+  const o = ORDERS.find(x=>x.id===id);
+  const actual = o ? (o.customer_email||"") : "";
+  const nuevo = prompt("Corregir el correo del cliente para el pedido #"+id+":", actual);
+  if(nuevo===null) return;
+  const email = nuevo.trim();
+  if(!email){ toast("Correo vacío"); return; }
+  try{
+    const r = await api(`/api/admin/orders/${id}/email`,{method:"PUT",body:JSON.stringify({email})});
+    if(o) o.customer_email = r.customer_email;
+    renderOrders();
+    toast("Correo actualizado ✓");
+  }catch(err){ toast(err.message); }
+}
+async function cancelOrder(id){
+  const o = ORDERS.find(x=>x.id===id);
+  const eraPagado = o && o.payment_status==="paid";
+  const msg = eraPagado
+    ? "¿Cancelar el pedido #"+id+"?\n\nEstaba PAGADO: se devolverá el stock de sus productos y se enviará un correo de cancelación al cliente."
+    : "¿Cancelar el pedido #"+id+"?\n\nSe enviará un correo de cancelación al cliente.";
+  if(!confirm(msg)) return;
+  try{
+    const r = await api(`/api/admin/orders/${id}/cancel`,{method:"POST"});
+    toast("Pedido cancelado"+(r.stock_devuelto?" · stock devuelto":"")+(r.correo&&r.correo.ok?" · correo enviado":""));
+    await loadOrders();
+    DATA = await api("/api/admin/products"); // refrescar stock en memoria
+  }catch(err){ toast(err.message); }
+}
+async function archiveOrder(id, archived){
+  try{
+    await api(`/api/admin/orders/${id}/archive`,{method:"POST",body:JSON.stringify({archived})});
+    toast(archived ? "Pedido archivado 📁" : "Pedido desarchivado");
+    await loadOrders();
+  }catch(err){ toast(err.message); }
 }
 async function saveOrderShipping(id){
   const payload = {
@@ -723,10 +810,19 @@ async function markPaid(id){
   }catch(err){ toast(err.message); }
 }
 async function testAvisos(){
+  // Permite opcionalmente probar el envío a un correo de cliente escrito a mano.
+  const cliente = (prompt("Prueba de avisos.\n\nDeja vacío para probar solo el correo de admin,\no escribe un correo real para probar también el envío a un cliente:", "")||"").trim();
   toast("Enviando avisos de prueba…");
   try{
-    const r = await api("/api/admin/test-avisos",{method:"POST"});
-    toast("Correo: "+(r.correo?"✓":"✗")+" · Telegram: "+(r.telegram?"✓":"✗"));
+    const body = cliente ? JSON.stringify({cliente}) : undefined;
+    const r = await api("/api/admin/test-avisos",{method:"POST", body});
+    const a = r.admin || {};
+    const c = r.cliente || {};
+    let msg = "Admin: "+(a.ok?"✓":"✗ ("+a.status+")")+" · Telegram: "+(r.telegram?"✓":"✗");
+    if(c.destinatario) msg += " · Cliente: "+(c.ok?"✓":"✗ ("+c.status+")");
+    toast(msg);
+    // Deja el detalle completo en la consola para diagnóstico.
+    console.log("Resultado test-avisos:", JSON.stringify(r,null,2));
   }catch(err){ toast(err.message); }
 }
 
