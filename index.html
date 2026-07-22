@@ -217,6 +217,7 @@
     <button class="chip active" id="ordView-activos" onclick="setOrdView('activos')">Activos</button>
     <button class="chip" id="ordView-archivados" onclick="setOrdView('archivados')">📁 Archivados</button>
   </div>
+  <input class="search" id="ordSearch" placeholder="Buscar por código, # de pedido, nombre, correo o teléfono…" style="max-width:480px;margin-bottom:16px" oninput="renderOrders()">
   <div class="ofilters" id="ordFilters"></div>
   <div id="ordersWrap"><div class="loading">Cargando pedidos…</div></div>
 </div>
@@ -626,6 +627,7 @@ function setOrdView(v){
   if(ordView===v) return;
   ordView = v;
   ordFilter = "todos";
+  const s = document.getElementById("ordSearch"); if(s) s.value = "";
   document.getElementById("ordView-activos").classList.toggle("active", v==="activos");
   document.getElementById("ordView-archivados").classList.toggle("active", v==="archivados");
   loadOrders();
@@ -644,14 +646,41 @@ function renderOrdFilters(){
     `<button class="chip ${ordFilter===k?'active':''}" onclick="setOrdFilter('${k}')">${label}</button>`).join("");
 }
 function setOrdFilter(k){ ordFilter=k; renderOrdFilters(); renderOrders(); }
+// Código de pedido: número + fecha del pedido en formato DDMMAA, con guion para leerse claro.
+// Ej. Pedido #5 del 21/07/2026 → "5-210726".
+function orderCode(o){
+  const d = new Date((o.created_at||"").includes("T") ? o.created_at : (o.created_at||"").replace(" ","T")+"Z");
+  if(isNaN(d)) return String(o.id);
+  const dd = String(d.getDate()).padStart(2,"0");
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  const aa = String(d.getFullYear()).slice(-2);
+  return `${o.id}-${dd}${mm}${aa}`;
+}
 function filteredOrders(){
-  if(ordFilter==="todos") return ORDERS;
-  if(ordFilter==="por_enviar") return ORDERS.filter(o=>o.payment_status==="paid" && o.shipping_status==="pending");
-  if(ordFilter==="paid") return ORDERS.filter(o=>o.payment_status==="paid");
-  if(ordFilter==="pending") return ORDERS.filter(o=>o.payment_status==="pending");
-  if(ordFilter==="rejected") return ORDERS.filter(o=>o.payment_status==="rejected"||o.payment_status==="error");
-  if(ordFilter==="cancelled") return ORDERS.filter(o=>o.payment_status==="cancelled");
-  return ORDERS;
+  let list = ORDERS;
+  // Filtro por estado (chips)
+  if(ordFilter==="por_enviar") list = list.filter(o=>o.payment_status==="paid" && o.shipping_status==="pending");
+  else if(ordFilter==="paid") list = list.filter(o=>o.payment_status==="paid");
+  else if(ordFilter==="pending") list = list.filter(o=>o.payment_status==="pending");
+  else if(ordFilter==="rejected") list = list.filter(o=>o.payment_status==="rejected"||o.payment_status==="error");
+  else if(ordFilter==="cancelled") list = list.filter(o=>o.payment_status==="cancelled");
+  // Búsqueda por texto: código, # de pedido, nombre, correo o teléfono
+  const searchEl = document.getElementById("ordSearch");
+  const q = searchEl ? searchEl.value.trim().toLowerCase() : "";
+  if(q){
+    // Normaliza el término y el código quitando guiones/espacios, para que "5210726" y "5-210726" coincidan.
+    const qn = q.replace(/[\s-]/g,"");
+    list = list.filter(o=>{
+      const code = orderCode(o).toLowerCase();
+      const codeN = code.replace(/[\s-]/g,"");
+      return code.includes(q) || codeN.includes(qn) ||
+             String(o.id).includes(qn) ||
+             (o.customer_name||"").toLowerCase().includes(q) ||
+             (o.customer_email||"").toLowerCase().includes(q) ||
+             (o.customer_phone||"").toLowerCase().includes(qn);
+    });
+  }
+  return list;
 }
 function fmtDate(s){
   if(!s) return "";
@@ -662,7 +691,12 @@ function fmtDate(s){
 function renderOrders(){
   const list = filteredOrders();
   const wrap = document.getElementById("ordersWrap");
-  if(!list.length){ wrap.innerHTML = '<div class="oempty">No hay pedidos en esta vista.</div>'; return; }
+  if(!list.length){
+    const searchEl = document.getElementById("ordSearch");
+    const buscando = searchEl && searchEl.value.trim();
+    wrap.innerHTML = '<div class="oempty">'+(buscando ? 'No se encontraron pedidos que coincidan con la búsqueda.' : 'No hay pedidos en esta vista.')+'</div>';
+    return;
+  }
   wrap.innerHTML = list.map(o=>{
     const pcls = "pay-"+(o.payment_status||"pending");
     const scls = "ship-"+(o.shipping_status||"pending");
@@ -676,6 +710,7 @@ function renderOrders(){
         <div>
           <div class="oid">Pedido #${o.id}</div>
           <div class="odate">${fmtDate(o.created_at)}</div>
+          <div style="font-size:12px;color:var(--oro);font-weight:700;letter-spacing:.5px;margin-top:2px">Código: ${orderCode(o)}</div>
         </div>
         <div class="obadges">
           <span class="obadge ${pcls}">${PAY_LABEL[o.payment_status]||o.payment_status}</span>
