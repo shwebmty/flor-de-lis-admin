@@ -286,6 +286,38 @@
       </div>
     </div>
 
+    <div class="varsec" id="qtyDiscSection">
+      <div class="lbl serif">Descuento por cantidad (opcional)</div>
+      <p class="sub">Promoción al llevar varias piezas del mismo producto (2x1, 3x2, o % desde N unidades). Requiere stock suficiente. Se aplica sobre el precio ya rebajado si el producto tiene descuento directo.</p>
+      <div class="field"><label>Tipo</label>
+        <select id="f_qty_type" onchange="onQtyTypeChange()">
+          <option value="">Sin descuento por cantidad</option>
+          <option value="nxm">NxM — compra N, paga M (ej. 2x1)</option>
+          <option value="percent">% al llevar N o más</option>
+        </select>
+      </div>
+      <div id="qtyFields" style="display:none">
+        <div class="field"><label id="f_qty_min_lbl">Cantidad mínima (N)</label><input id="f_qty_min" type="number" min="2" placeholder="2"></div>
+        <div class="field"><label id="f_qty_val_lbl">Paga (M)</label><input id="f_qty_value" type="number" min="0" step="0.01" placeholder="1"></div>
+        <div class="field"><label>Nombre visible (ej. "2x1", "3x2"). Si lo dejas vacío se genera solo.</label><input id="f_qty_label" placeholder="2x1"></div>
+        <div class="field"><label>Vigencia</label>
+          <select id="f_qty_mode" onchange="onQtyModeChange()">
+            <option value="manual">Activación manual (on/off)</option>
+            <option value="fechas">Por fechas (inicio y fin)</option>
+          </select>
+        </div>
+        <div id="qtyManual" class="field">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="f_qty_active" style="width:auto"> Promoción activa ahora
+          </label>
+        </div>
+        <div id="qtyFechas" style="display:none">
+          <div class="field"><label>Fecha de inicio</label><input id="f_qty_start" type="date"></div>
+          <div class="field"><label>Fecha de fin</label><input id="f_qty_end" type="date"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="varsec" id="variantsSection" style="display:none">
       <div class="lbl serif">Variantes y stock</div>
       <p class="sub">Escribe cada combinación tal como quieres venderla (ej. “Rosa - L”, “Azul - XL”). Si el producto no tiene variantes, deja esto vacío y se vende como pieza única con las existencias de arriba.</p>
@@ -1024,7 +1056,7 @@ function openProductModal(id){
   document.getElementById("variantsNote").style.display = isNew?"block":"none";
   document.getElementById("varErr").textContent="";
   document.getElementById("newVarName").value=""; document.getElementById("newVarStock").value="";
-  if(isNew){ ["f_name","f_id","f_price","f_desc","f_stock"].forEach(i=>document.getElementById(i).value=""); loadDiscountFields(null); }
+  if(isNew){ ["f_name","f_id","f_price","f_desc","f_stock"].forEach(i=>document.getElementById(i).value=""); loadDiscountFields(null); loadQtyFields(null); }
   else{
     const p=DATA.products.find(x=>x.id===editingId);
     document.getElementById("f_name").value=p.name;
@@ -1033,6 +1065,7 @@ function openProductModal(id){
     document.getElementById("f_desc").value=p.description||"";
     document.getElementById("f_stock").value=(p.stock??"");
     loadDiscountFields(p);
+    loadQtyFields(p);
     renderVariants();
   }
   document.getElementById("prodOverlay").classList.add("open");
@@ -1049,6 +1082,31 @@ function loadDiscountFields(p){
   document.getElementById("f_disc_start").value = p && p.discount_start ? p.discount_start : "";
   document.getElementById("f_disc_end").value = p && p.discount_end ? p.discount_end : "";
   onDiscTypeChange(); onDiscModeChange();
+}
+// Carga los campos de descuento por cantidad desde el producto (o los limpia).
+function loadQtyFields(p){
+  const t = p && p.qty_disc_type ? p.qty_disc_type : "";
+  document.getElementById("f_qty_type").value = t;
+  document.getElementById("f_qty_min").value = p && p.qty_disc_min!=null ? p.qty_disc_min : "";
+  document.getElementById("f_qty_value").value = p && p.qty_disc_value!=null ? p.qty_disc_value : "";
+  document.getElementById("f_qty_label").value = p && p.qty_disc_label ? p.qty_disc_label : "";
+  const usaFechas = p && (p.qty_disc_start || p.qty_disc_end);
+  document.getElementById("f_qty_mode").value = usaFechas ? "fechas" : "manual";
+  document.getElementById("f_qty_active").checked = !!(p && Number(p.qty_disc_active)===1);
+  document.getElementById("f_qty_start").value = p && p.qty_disc_start ? p.qty_disc_start : "";
+  document.getElementById("f_qty_end").value = p && p.qty_disc_end ? p.qty_disc_end : "";
+  onQtyTypeChange(); onQtyModeChange();
+}
+function onQtyTypeChange(){
+  const t = document.getElementById("f_qty_type").value;
+  document.getElementById("qtyFields").style.display = t ? "block" : "none";
+  document.getElementById("f_qty_min_lbl").textContent = t==="percent" ? "A partir de cuántas piezas (N)" : "Cantidad que se lleva (N)";
+  document.getElementById("f_qty_val_lbl").textContent = t==="percent" ? "Porcentaje de descuento (ej. 20)" : "Cuántas paga (M) — ej. 1 para un 2x1";
+}
+function onQtyModeChange(){
+  const m = document.getElementById("f_qty_mode").value;
+  document.getElementById("qtyManual").style.display = m==="manual" ? "block" : "none";
+  document.getElementById("qtyFechas").style.display = m==="fechas" ? "block" : "none";
 }
 function onDiscTypeChange(){
   const t = document.getElementById("f_disc_type").value;
@@ -1088,6 +1146,25 @@ async function saveProduct(){
     }
   }else{
     payload.discount_type = null;
+  }
+  // Descuento por cantidad
+  const qType = document.getElementById("f_qty_type").value;
+  if(qType){
+    payload.qty_disc_type = qType;
+    payload.qty_disc_min = document.getElementById("f_qty_min").value;
+    payload.qty_disc_value = document.getElementById("f_qty_value").value;
+    payload.qty_disc_label = document.getElementById("f_qty_label").value.trim();
+    const qm = document.getElementById("f_qty_mode").value;
+    if(qm==="fechas"){
+      payload.qty_disc_active = 0;
+      payload.qty_disc_start = document.getElementById("f_qty_start").value || null;
+      payload.qty_disc_end = document.getElementById("f_qty_end").value || null;
+    }else{
+      payload.qty_disc_active = document.getElementById("f_qty_active").checked ? 1 : 0;
+      payload.qty_disc_start = null; payload.qty_disc_end = null;
+    }
+  }else{
+    payload.qty_disc_type = null;
   }
   if(!payload.name){ errEl.textContent="El nombre es obligatorio."; return; }
   btn.disabled=true;
