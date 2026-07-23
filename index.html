@@ -209,6 +209,7 @@
   <div class="toolbar">
     <div class="stats" id="ordStats" style="margin:0"></div>
     <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" onclick="openShippingConfig()">⚙ Envío</button>
       <button class="btn btn-ghost" onclick="testAvisos()">✉ Probar avisos</button>
       <button class="btn btn-ghost" onclick="loadOrders()">↻ Actualizar</button>
     </div>
@@ -224,6 +225,26 @@
 
 <input type="file" id="uploadInput" accept="image/*" multiple style="display:none" onchange="onFilesPicked(event)">
 
+<div class="overlay" id="shipOverlay">
+  <div class="modal">
+    <h3 class="serif">Configuración de envío</h3>
+    <div class="field">
+      <label>Costo de envío (MXN)</label>
+      <input id="s_ship_cost" type="number" min="0" placeholder="100">
+    </div>
+    <div class="field">
+      <label>Umbral de envío gratis (MXN)</label>
+      <input id="s_free_thr" type="number" min="0" placeholder="0">
+      <p style="font-size:12px;color:var(--tinta-suave);margin:6px 0 0">Si el subtotal del cliente llega a este monto, el envío es gratis. Pon <b>0</b> para desactivar el envío gratis (siempre se cobra el envío).</p>
+    </div>
+    <div class="err" id="shipErr"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeShippingConfig()">Cerrar</button>
+      <button class="btn btn-primary" id="shipSaveBtn" onclick="saveShippingConfig()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="prodOverlay">
   <div class="modal">
     <h3 id="prodModalTitle" class="serif">Editar producto</h3>
@@ -233,6 +254,37 @@
     <div class="field"><label>Precio (MXN)</label><input id="f_price" type="number" min="0"></div>
     <div class="field"><label>Descripción</label><textarea id="f_desc"></textarea></div>
     <div class="field"><label>Existencias del producto (solo si NO tiene variantes; normalmente 1)</label><input id="f_stock" type="number" min="0" placeholder="vacío = no mostrar"></div>
+
+    <div class="varsec" id="discountSection">
+      <div class="lbl serif">Descuento (opcional)</div>
+      <p class="sub">Si el producto tiene una oferta, configúrala aquí. Se mostrará en la tienda con el precio original tachado.</p>
+      <div class="field"><label>Tipo de descuento</label>
+        <select id="f_disc_type" onchange="onDiscTypeChange()">
+          <option value="">Sin descuento</option>
+          <option value="percent">Porcentaje (%)</option>
+          <option value="fixed">Precio rebajado fijo ($)</option>
+        </select>
+      </div>
+      <div id="discFields" style="display:none">
+        <div class="field"><label id="f_disc_value_lbl">Valor</label><input id="f_disc_value" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Nombre visible del descuento (ej. "30% de primavera", "Oferta")</label><input id="f_disc_label" placeholder="Oferta"></div>
+        <div class="field"><label>Vigencia</label>
+          <select id="f_disc_mode" onchange="onDiscModeChange()">
+            <option value="manual">Activación manual (on/off)</option>
+            <option value="fechas">Por fechas (inicio y fin)</option>
+          </select>
+        </div>
+        <div id="discManual" class="field">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="f_disc_active" style="width:auto"> Descuento activo ahora
+          </label>
+        </div>
+        <div id="discFechas" style="display:none">
+          <div class="field"><label>Fecha de inicio</label><input id="f_disc_start" type="date"></div>
+          <div class="field"><label>Fecha de fin</label><input id="f_disc_end" type="date"></div>
+        </div>
+      </div>
+    </div>
 
     <div class="varsec" id="variantsSection" style="display:none">
       <div class="lbl serif">Variantes y stock</div>
@@ -854,6 +906,33 @@ async function markPaid(id){
     DATA = await api("/api/admin/products"); // refrescar stock en memoria
   }catch(err){ toast(err.message); }
 }
+async function openShippingConfig(){
+  document.getElementById("shipErr").textContent = "";
+  try{
+    const s = await api("/api/admin/settings");
+    document.getElementById("s_ship_cost").value = s.shipping_cost ?? 100;
+    document.getElementById("s_free_thr").value = s.free_shipping_threshold ?? 0;
+  }catch(err){
+    document.getElementById("s_ship_cost").value = 100;
+    document.getElementById("s_free_thr").value = 0;
+  }
+  document.getElementById("shipOverlay").classList.add("open");
+}
+function closeShippingConfig(){ document.getElementById("shipOverlay").classList.remove("open"); }
+async function saveShippingConfig(){
+  const btn=document.getElementById("shipSaveBtn"), errEl=document.getElementById("shipErr"); errEl.textContent="";
+  const cost = Number(document.getElementById("s_ship_cost").value);
+  const thr = Number(document.getElementById("s_free_thr").value);
+  if(isNaN(cost)||cost<0){ errEl.textContent="Costo de envío no válido."; return; }
+  if(isNaN(thr)||thr<0){ errEl.textContent="Umbral no válido."; return; }
+  btn.disabled=true;
+  try{
+    await api("/api/admin/settings",{method:"PUT",body:JSON.stringify({shipping_cost:cost, free_shipping_threshold:thr})});
+    toast("Configuración de envío guardada");
+    closeShippingConfig();
+  }catch(err){ errEl.textContent=err.message; }
+  finally{ btn.disabled=false; }
+}
 async function testAvisos(){
   // Permite opcionalmente probar el envío a un correo de cliente escrito a mano.
   const cliente = (prompt("Prueba de avisos.\n\nDeja vacío para probar solo el correo de admin,\no escribe un correo real para probar también el envío a un cliente:", "")||"").trim();
@@ -945,7 +1024,7 @@ function openProductModal(id){
   document.getElementById("variantsNote").style.display = isNew?"block":"none";
   document.getElementById("varErr").textContent="";
   document.getElementById("newVarName").value=""; document.getElementById("newVarStock").value="";
-  if(isNew){ ["f_name","f_id","f_price","f_desc","f_stock"].forEach(i=>document.getElementById(i).value=""); }
+  if(isNew){ ["f_name","f_id","f_price","f_desc","f_stock"].forEach(i=>document.getElementById(i).value=""); loadDiscountFields(null); }
   else{
     const p=DATA.products.find(x=>x.id===editingId);
     document.getElementById("f_name").value=p.name;
@@ -953,9 +1032,33 @@ function openProductModal(id){
     document.getElementById("f_price").value=p.price;
     document.getElementById("f_desc").value=p.description||"";
     document.getElementById("f_stock").value=(p.stock??"");
+    loadDiscountFields(p);
     renderVariants();
   }
   document.getElementById("prodOverlay").classList.add("open");
+}
+// Carga los campos de descuento desde el producto (o los limpia si es nuevo).
+function loadDiscountFields(p){
+  const type = p && p.discount_type ? p.discount_type : "";
+  document.getElementById("f_disc_type").value = type;
+  document.getElementById("f_disc_value").value = p && p.discount_value!=null ? p.discount_value : "";
+  document.getElementById("f_disc_label").value = p && p.discount_label ? p.discount_label : "";
+  const usaFechas = p && (p.discount_start || p.discount_end);
+  document.getElementById("f_disc_mode").value = usaFechas ? "fechas" : "manual";
+  document.getElementById("f_disc_active").checked = !!(p && Number(p.discount_active)===1);
+  document.getElementById("f_disc_start").value = p && p.discount_start ? p.discount_start : "";
+  document.getElementById("f_disc_end").value = p && p.discount_end ? p.discount_end : "";
+  onDiscTypeChange(); onDiscModeChange();
+}
+function onDiscTypeChange(){
+  const t = document.getElementById("f_disc_type").value;
+  document.getElementById("discFields").style.display = t ? "block" : "none";
+  document.getElementById("f_disc_value_lbl").textContent = t==="percent" ? "Porcentaje (ej. 30 = 30%)" : (t==="fixed" ? "Precio rebajado ($)" : "Valor");
+}
+function onDiscModeChange(){
+  const m = document.getElementById("f_disc_mode").value;
+  document.getElementById("discManual").style.display = m==="manual" ? "block" : "none";
+  document.getElementById("discFechas").style.display = m==="fechas" ? "block" : "none";
 }
 function closeProductModal(){ document.getElementById("prodOverlay").classList.remove("open"); editingId=null; }
 async function saveProduct(){
@@ -967,6 +1070,25 @@ async function saveProduct(){
     description:document.getElementById("f_desc").value.trim(),
     stock:document.getElementById("f_stock").value,
   };
+  // Descuento
+  const dType = document.getElementById("f_disc_type").value;
+  if(dType){
+    payload.discount_type = dType;
+    payload.discount_value = document.getElementById("f_disc_value").value;
+    payload.discount_label = document.getElementById("f_disc_label").value.trim();
+    const modo = document.getElementById("f_disc_mode").value;
+    if(modo==="fechas"){
+      payload.discount_active = 0;
+      payload.discount_start = document.getElementById("f_disc_start").value || null;
+      payload.discount_end = document.getElementById("f_disc_end").value || null;
+    }else{
+      payload.discount_active = document.getElementById("f_disc_active").checked ? 1 : 0;
+      payload.discount_start = null;
+      payload.discount_end = null;
+    }
+  }else{
+    payload.discount_type = null;
+  }
   if(!payload.name){ errEl.textContent="El nombre es obligatorio."; return; }
   btn.disabled=true;
   try{
