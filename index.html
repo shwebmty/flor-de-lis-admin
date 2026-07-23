@@ -256,7 +256,7 @@
     <div class="field"><label>Existencias del producto (solo si NO tiene variantes; normalmente 1)</label><input id="f_stock" type="number" min="0" placeholder="vacío = no mostrar"></div>
 
     <div class="varsec" id="discountSection">
-      <div class="lbl serif">Descuento fijo (opcional)</div>
+      <div class="lbl serif">Descuento (opcional)</div>
       <p class="sub">Si el producto tiene una oferta, configúrala aquí. Se mostrará en la tienda con el precio original tachado.</p>
       <div class="field"><label>Tipo de descuento</label>
         <select id="f_disc_type" onchange="onDiscTypeChange()">
@@ -806,6 +806,7 @@ function renderOrders(){
         ${o.customer_email?`✉ ${esc(o.customer_email)}<br>`:""}
         ${o.customer_phone?`✆ ${esc(o.customer_phone)}`:""}
       </div>
+      ${renderAddress(o.shipping_address)}
       ${o.payment_status==="cancelled" && o.cancel_reason ? `<div style="font-size:12px;color:#a12525;background:#faf0f0;border-radius:6px;padding:8px 10px;margin-bottom:12px"><b>Nota interna de cancelación:</b> ${esc(o.cancel_reason)}</div>` : ""}
       <div class="oitems">
         ${items||'<div class="oitem">Sin artículos</div>'}
@@ -840,6 +841,24 @@ function renderOrders(){
       ${renderOrderActions(o)}
     </div>`;
   }).join("");
+}
+// Muestra la dirección de entrega del pedido (guardada como JSON) con botón para copiarla.
+function renderAddress(json){
+  let d=null;
+  try{ d = JSON.parse(json||"null"); }catch{}
+  if(!d || !d.calle) return '<div style="font-size:12px;color:var(--tinta-suave);font-style:italic;margin-bottom:12px">Sin dirección registrada (pedido anterior a esta función).</div>';
+  const texto = `${d.calle} ${d.numero||""}, Col. ${d.colonia||""}, ${d.cp||""} ${d.ciudad||""}, ${d.estado||""}${d.referencias?" — Ref: "+d.referencias:""}`;
+  return `<div style="background:var(--crema);border-left:3px solid var(--oro);border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.6">
+    <b style="color:var(--vino);font-size:11px;text-transform:uppercase;letter-spacing:.5px">Dirección de entrega</b>
+    <button class="oact" style="float:right;padding:3px 8px;font-size:11px" onclick='copiarDireccion(${JSON.stringify(texto)})'>Copiar</button><br>
+    ${esc(d.calle)} ${esc(d.numero||"")}<br>
+    Col. ${esc(d.colonia||"")}<br>
+    ${esc(d.cp||"")} ${esc(d.ciudad||"")}, ${esc(d.estado||"")}
+    ${d.referencias?`<br><span style="color:var(--tinta-suave)">Ref: ${esc(d.referencias)}</span>`:""}
+  </div>`;
+}
+function copiarDireccion(texto){
+  navigator.clipboard.writeText(texto).then(()=>toast("Dirección copiada")).catch(()=>toast("No se pudo copiar"));
 }
 // Barra de acciones por pedido: reenviar correo, editar correo, cancelar, archivar/desarchivar.
 function renderOrderActions(o){
